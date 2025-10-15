@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, GenerateContentResponse } from '@google/genai';
+import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from '@google/genai';
 import type { Character } from '../types';
 
 let aiInstance: GoogleGenAI | null = null;
@@ -26,21 +26,30 @@ export const getAI = (): GoogleGenAI => {
 export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' | '3:4' = '1:1'): Promise<string> => {
   const ai = getAI();
   try {
-    const response = await ai.models.generateImages({
-      model: 'imagen-4.0-generate-001',
-      prompt: prompt,
+    const fullPrompt = `${prompt}, aspect ratio ${aspectRatio}.`;
+    
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: fullPrompt }],
+      },
       config: {
-        numberOfImages: 1,
-        outputMimeType: 'image/jpeg',
-        aspectRatio,
+        responseModalities: [Modality.IMAGE],
       },
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-      const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-      return `data:image/jpeg;base64,${base64ImageBytes}`;
+    const candidate = response.candidates?.[0];
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        if (part.inlineData) {
+          const base64ImageBytes: string = part.inlineData.data;
+          // gemini-2.5-flash-image returns PNG
+          return `data:image/png;base64,${base64ImageBytes}`;
+        }
+      }
     }
-    throw new Error('No image was generated.');
+
+    throw new Error('No image was generated from response.');
   } catch (error) {
     console.error('Error in generateImage:', error);
     throw error;
