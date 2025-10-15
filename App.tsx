@@ -6,10 +6,12 @@ import ChatInterface from './components/ChatInterface';
 import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
-import UserInfoModal from './components/UserInfoModal';
-import { generateImage, getAIResponse, generateGreeting } from './services/geminiService';
+import SettingsModal from './components/SettingsModal';
+import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI } from './services/geminiService';
+import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting } from './services/dbService';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string>('');
   const [userName, setUserName] = useState<string>('User');
   const [userPersonality, setUserPersonality] = useState<string>('');
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -18,9 +20,9 @@ const App: React.FC = () => {
   const [sceneImageUrl, setSceneImageUrl] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [loadingMessage, setLoadingMessage] = useState<string>('Loading...');
+  const [loadingMessage, setLoadingMessage] = useState<string>('Initializing App...');
   const [showCreator, setShowCreator] = useState<boolean>(false);
-  const [showUserInfo, setShowUserInfo] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'characterList' | 'chat'>('characterList');
 
   const chatRef = useRef<Chat | null>(null);
@@ -42,31 +44,49 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-    try {
-      const storedCharacters = localStorage.getItem('vn-characters');
-      if (storedCharacters) setCharacters(JSON.parse(storedCharacters));
-      
-      const storedUserName = localStorage.getItem('vn-userName');
-      if (storedUserName) setUserName(storedUserName);
-      
-      const storedUserPersonality = localStorage.getItem('vn-userPersonality');
-      if (storedUserPersonality) setUserPersonality(storedUserPersonality);
+    const loadData = async () => {
+      try {
+        setLoadingMessage('Loading settings...');
+        const storedApiKey = await getSetting<string>('apiKey');
+        
+        if (storedApiKey) {
+          setApiKey(storedApiKey);
+          initializeAI(storedApiKey);
+          
+          const storedUserName = await getSetting<string>('userName') || 'User';
+          setUserName(storedUserName);
+          
+          const storedUserPersonality = await getSetting<string>('userPersonality') || '';
+          setUserPersonality(storedUserPersonality);
+          
+          setLoadingMessage('Loading characters...');
+          const storedCharacters = await getAllCharacters();
+          setCharacters(storedCharacters);
 
-    } catch (error) {
-      console.error("Failed to load data from storage:", error);
-      localStorage.clear(); 
-    } finally {
-      setIsLoading(false);
-    }
+        } else {
+          // No API key, prompt user to enter one.
+          setShowSettings(true);
+          setLoadingMessage('Please enter your API Key to begin.');
+        }
+
+      } catch (error) {
+        console.error("Failed to load data from database:", error);
+        setLoadingMessage('Error loading data. Please refresh.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
   }, []);
   
   const initializeChat = useCallback((char: Character, currentUserName: string, currentUserPersonality: string) => {
-    if (!process.env.API_KEY) {
-      console.error("API_KEY not found.");
+    if (!isAIInitialized()) {
+      console.error("AI not initialized. Cannot start chat.");
+      alert("API Key is not configured correctly. Please check settings.");
       return;
     }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = getAI();
 
     const systemInstruction = `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
     You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character. When you respond, you must determine your current emotion based on the conversation.
@@ -136,18 +156,25 @@ const App: React.FC = () => {
       if (sprites) { // Uploaded or edited sprites
         finalCharacter = { ...data, id: editingCharacter?.id || Date.now().toString(), sprites };
       } else { // AI generation needed
+        if (!isAIInitialized()) {
+            alert('API Key is not set. Please set it in the settings.');
+            setIsLoading(false);
+            return;
+        }
         const assets = await generateCharacterAssets(data);
         finalCharacter = { ...assets, id: editingCharacter?.id || Date.now().toString() };
       }
 
+      await saveCharacter(finalCharacter);
+      
       const updatedCharacters = editingCharacter
         ? characters.map(c => c.id === editingCharacter.id ? finalCharacter : c)
         : [...characters, finalCharacter];
       
       setCharacters(updatedCharacters);
-      localStorage.setItem('vn-characters', JSON.stringify(updatedCharacters));
     } catch (error) {
       console.error("Error saving character:", error);
+      alert(`Error saving character: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsLoading(false);
     }
@@ -180,12 +207,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteCharacter = (characterId: string) => {
+  const handleDeleteCharacter = async (characterId: string) => {
     const characterToDelete = characters.find(c => c.id === characterId);
     if (characterToDelete && window.confirm(`Are you sure you want to delete ${characterToDelete.name}? This cannot be undone.`)) {
+      await deleteCharacterDB(characterId);
       const updatedCharacters = characters.filter(c => c.id !== characterId);
       setCharacters(updatedCharacters);
-      localStorage.setItem('vn-characters', JSON.stringify(updatedCharacters));
     }
   };
 
@@ -207,12 +234,33 @@ const App: React.FC = () => {
     setEditingCharacter(null);
   };
 
-  const handleSaveUserInfo = (newUserName: string, newUserPersonality: string) => {
-    setUserName(newUserName);
-    setUserPersonality(newUserPersonality);
-    localStorage.setItem('vn-userName', newUserName);
-    localStorage.setItem('vn-userPersonality', newUserPersonality);
-    setShowUserInfo(false);
+  const handleSaveSettings = async (newUserName: string, newUserPersonality: string, newApiKey: string) => {
+    setIsLoading(true);
+    setLoadingMessage('Saving settings...');
+    try {
+      await setSetting('apiKey', newApiKey);
+      await setSetting('userName', newUserName);
+      await setSetting('userPersonality', newUserPersonality);
+
+      setApiKey(newApiKey);
+      setUserName(newUserName);
+      setUserPersonality(newUserPersonality);
+      
+      initializeAI(newApiKey);
+
+      // If this is the first time setting the key, load characters
+      if (characters.length === 0) {
+          const storedCharacters = await getAllCharacters();
+          setCharacters(storedCharacters);
+      }
+
+      setShowSettings(false);
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      alert('Could not save settings.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSetSceneFromUpload = (dataUrl: string) => {
@@ -224,7 +272,8 @@ const App: React.FC = () => {
     <div className="w-screen h-screen bg-black flex justify-center items-center overflow-hidden">
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
         {isLoading && <LoadingOverlay message={loadingMessage} />}
-        {showUserInfo && <UserInfoModal currentName={userName} currentPersonality={userPersonality} onSave={handleSaveUserInfo} onClose={() => setShowUserInfo(false)} />}
+        {showSettings && <SettingsModal currentName={userName} currentPersonality={userPersonality} currentApiKey={apiKey} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}
+        
         {showCreator && (
           <CharacterCreator
             onSave={handleSaveCharacter}
@@ -233,14 +282,14 @@ const App: React.FC = () => {
           />
         )}
         
-        {currentPage === 'characterList' && !isLoading && (
+        {!isLoading && !showSettings && apiKey && currentPage === 'characterList' && (
           <CharacterListPage
             characters={characters}
             onSelectCharacter={handleSelectCharacter}
             onCreateNew={() => setShowCreator(true)}
             onEditCharacter={handleEditCharacter}
             onDeleteCharacter={handleDeleteCharacter}
-            onShowUserInfo={() => setShowUserInfo(true)}
+            onShowSettings={() => setShowSettings(true)}
           />
         )}
         

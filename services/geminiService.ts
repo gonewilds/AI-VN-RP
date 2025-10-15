@@ -1,15 +1,24 @@
 import { GoogleGenAI, Chat, GenerateContentResponse } from '@google/genai';
-// FIX: Imported the Character type to resolve 'Cannot find name' error.
 import type { Character } from '../types';
 
-// Singleton instance of GoogleGenAI
 let aiInstance: GoogleGenAI | null = null;
-const getAI = () => {
+
+export const initializeAI = (apiKey: string) => {
+  if (!apiKey) {
+    console.error("Attempted to initialize AI without an API key.");
+    aiInstance = null;
+    return;
+  }
+  aiInstance = new GoogleGenAI({ apiKey });
+};
+
+export const isAIInitialized = (): boolean => {
+    return !!aiInstance;
+};
+
+export const getAI = (): GoogleGenAI => {
   if (!aiInstance) {
-     if (!process.env.API_KEY) {
-      throw new Error("API_KEY not found in environment variables.");
-    }
-    aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    throw new Error("AI Service not initialized. Please provide an API key in settings.");
   }
   return aiInstance;
 };
@@ -74,7 +83,6 @@ export const generateGreeting = async (character: Pick<Character, 'personality'>
     Generate a short, friendly, in-character greeting directed at the user.
     Do not add any quotation marks or extra formatting. Just provide the line of dialogue.`;
     
-    // FIX: Removed deprecated `GenerateContentRequest` type and simplified the `contents` property to align with Gemini API best practices.
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Generate a greeting for ${userName}.`,

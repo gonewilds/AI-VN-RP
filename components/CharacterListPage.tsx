@@ -7,7 +7,7 @@ interface CharacterListPageProps {
   onCreateNew: () => void;
   onEditCharacter: (character: Character) => void;
   onDeleteCharacter: (characterId: string) => void;
-  onShowUserInfo: () => void;
+  onShowSettings: () => void;
 }
 
 const CharacterListPage: React.FC<CharacterListPageProps> = ({
@@ -16,7 +16,7 @@ const CharacterListPage: React.FC<CharacterListPageProps> = ({
   onCreateNew,
   onEditCharacter,
   onDeleteCharacter,
-  onShowUserInfo,
+  onShowSettings,
 }) => {
   return (
     <div 
@@ -28,9 +28,9 @@ const CharacterListPage: React.FC<CharacterListPageProps> = ({
           AI Visual Novel
         </h1>
         <p className="text-gray-300 mt-2">Select a character to begin your story</p>
-         <button onClick={onShowUserInfo} className="absolute top-0 right-0 text-white bg-purple-600 hover:bg-purple-700 p-2 rounded-full transition-transform transform hover:scale-110" aria-label="User Info">
+         <button onClick={onShowSettings} className="absolute top-0 right-0 text-white bg-purple-600 hover:bg-purple-700 p-2 rounded-full transition-transform transform hover:scale-110" aria-label="Settings">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
             </svg>
         </button>
       </header>

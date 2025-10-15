@@ -1,6 +1,5 @@
 import type { Character, Emotion } from './types';
 
-// FIX: Added missing 'id' property to satisfy the Omit<Character, "sprites"> type.
 export const DEFAULT_CHARACTER: Omit<Character, 'sprites'> = {
   id: 'default-aiko',
   name: 'Aiko',
