@@ -285,6 +285,54 @@ const App: React.FC = () => {
     }
   };
   
+  const handleImportCharacters = async (importedData: any) => {
+    setIsLoading(true);
+    setLoadingMessage('Importing characters...');
+    try {
+      if (!Array.isArray(importedData)) {
+        throw new Error("Import file is not a valid character array.");
+      }
+      
+      const charactersToImport: Character[] = importedData.filter(c => c && c.id && c.name && c.sprites);
+      if (charactersToImport.length === 0) {
+        throw new Error("No valid character data found in file.");
+      }
+
+      const existingCharacters = await getAllCharacters();
+      const existingIds = new Set(existingCharacters.map(c => c.id));
+      
+      const promises = charactersToImport.map(char => {
+        let charToSave = { ...char };
+        // Ensure all emotion sprites are present, even if undefined in import
+        ALL_EMOTIONS.forEach(emotion => {
+          if (!charToSave.sprites[emotion]) {
+            charToSave.sprites[emotion] = charToSave.sprites.neutral; // Fallback to neutral
+          }
+        });
+
+        if (existingIds.has(charToSave.id)) {
+          // If ID exists, update the existing character
+          return saveCharacter(charToSave);
+        } else {
+          // Otherwise, save as a new character
+          return saveCharacter(charToSave);
+        }
+      });
+      
+      await Promise.all(promises);
+      
+      const allLatestCharacters = await getAllCharacters();
+      setCharacters(allLatestCharacters);
+
+      alert(`Successfully imported/updated ${charactersToImport.length} character(s).`);
+    } catch (error) {
+      console.error("Failed to import characters:", error);
+      alert(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="w-screen h-screen bg-black flex justify-center items-center overflow-hidden">
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
@@ -307,6 +355,7 @@ const App: React.FC = () => {
             onEditCharacter={handleEditCharacter}
             onDeleteCharacter={handleDeleteCharacter}
             onShowSettings={() => setShowSettings(true)}
+            onImportCharacters={handleImportCharacters}
           />
         )}
         

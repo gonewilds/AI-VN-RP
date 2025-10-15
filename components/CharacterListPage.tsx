@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { Character } from '../types';
 
 interface CharacterListPageProps {
@@ -8,6 +8,7 @@ interface CharacterListPageProps {
   onEditCharacter: (character: Character) => void;
   onDeleteCharacter: (characterId: string) => void;
   onShowSettings: () => void;
+  onImportCharacters: (characters: Character[]) => void;
 }
 
 const CharacterListPage: React.FC<CharacterListPageProps> = ({
@@ -17,7 +18,64 @@ const CharacterListPage: React.FC<CharacterListPageProps> = ({
   onEditCharacter,
   onDeleteCharacter,
   onShowSettings,
+  onImportCharacters,
 }) => {
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportClick = () => {
+    if (characters.length === 0) {
+      alert("There are no characters to export.");
+      return;
+    }
+    try {
+      const dataStr = JSON.stringify(characters, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `ai-vn-characters-export-${new Date().toISOString().split('T')[0]}.json`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export characters:", error);
+      alert("An error occurred while exporting characters.");
+    }
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const importedData = JSON.parse(text);
+        onImportCharacters(importedData);
+      } catch (error) {
+        console.error("Failed to import file:", error);
+        alert("Invalid JSON file. Please select a valid character export file.");
+      }
+      // Reset the file input value to allow re-uploading the same file
+      if (importInputRef.current) {
+        importInputRef.current.value = '';
+      }
+    };
+    reader.onerror = () => {
+      alert("Error reading the file.");
+      if (importInputRef.current) {
+        importInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div 
       className="w-full h-full text-white p-4 sm:p-8 flex flex-col bg-cover bg-center"
@@ -28,11 +86,24 @@ const CharacterListPage: React.FC<CharacterListPageProps> = ({
           AI Visual Novel
         </h1>
         <p className="text-gray-300 mt-2">Select a character to begin your story</p>
-         <button onClick={onShowSettings} className="absolute top-0 right-0 text-white bg-purple-600 hover:bg-purple-700 p-2 rounded-full transition-transform transform hover:scale-110" aria-label="Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-        </button>
+         <div className="absolute top-0 right-0 flex items-center space-x-2">
+            <button onClick={handleImportClick} title="Import Characters" className="text-white bg-blue-600 hover:bg-blue-700 p-2 rounded-full transition-transform transform hover:scale-110">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <button onClick={handleExportClick} title="Export All Characters" className="text-white bg-green-600 hover:bg-green-700 p-2 rounded-full transition-transform transform hover:scale-110">
+               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM10 2a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 13.586V3a1 1 0 011-1z" clipRule="evenodd" />
+               </svg>
+            </button>
+            <button onClick={onShowSettings} className="text-white bg-purple-600 hover:bg-purple-700 p-2 rounded-full transition-transform transform hover:scale-110" aria-label="Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <input type="file" ref={importInputRef} onChange={handleFileSelect} className="hidden" accept="application/json,.json" />
+         </div>
       </header>
       <main className="flex-grow overflow-y-auto custom-scrollbar -mr-2 pr-2">
         {characters.length === 0 ? (
