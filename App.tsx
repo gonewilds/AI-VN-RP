@@ -7,6 +7,7 @@ import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
 import SettingsModal from './components/SettingsModal';
+import ChatSettingsModal from './components/ChatSettingsModal';
 import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI } from './services/geminiService';
 import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting } from './services/dbService';
 
@@ -23,10 +24,11 @@ const App: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>('Initializing App...');
   const [showCreator, setShowCreator] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showChatSettings, setShowChatSettings] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'characterList' | 'chat'>('characterList');
 
   const chatRef = useRef<Chat | null>(null);
-  
+
   const generateCharacterAssets = useCallback(async (charData: Omit<Character, 'sprites' | 'id'>): Promise<Omit<Character, 'id'>> => {
     setLoadingMessage(`Creating character: ${charData.name}...`);
     
@@ -80,6 +82,13 @@ const App: React.FC = () => {
     loadData();
   }, []);
   
+  const getDefaultSystemInstruction = (char: Character, currentUserName: string, currentUserPersonality: string): string => {
+    return `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
+    You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character. When you respond, you must determine your current emotion based on the conversation.
+    Your response must be in a valid JSON format with two keys: "dialogue" for what you say, and "emotion" for how you feel. 
+    The possible emotions are only: ${ALL_EMOTIONS.join(', ')}. Example: {"dialogue": "Hello there, ${currentUserName}!", "emotion": "happy"}`;
+  };
+
   const initializeChat = useCallback((char: Character, currentUserName: string, currentUserPersonality: string) => {
     if (!isAIInitialized()) {
       console.error("AI not initialized. Cannot start chat.");
@@ -88,10 +97,7 @@ const App: React.FC = () => {
     }
     const ai = getAI();
 
-    const systemInstruction = `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
-    You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character. When you respond, you must determine your current emotion based on the conversation.
-    Your response must be in a valid JSON format with two keys: "dialogue" for what you say, and "emotion" for how you feel. 
-    The possible emotions are only: ${ALL_EMOTIONS.join(', ')}. Example: {"dialogue": "Hello there, ${currentUserName}!", "emotion": "happy"}`;
+    const systemInstruction = char.systemInstruction || getDefaultSystemInstruction(char, currentUserName, currentUserPersonality);
 
     chatRef.current = ai.chats.create({
       model: 'gemini-2.5-flash',
@@ -108,6 +114,24 @@ const App: React.FC = () => {
       },
     });
   }, []);
+  
+  const handleBackToCharacterList = useCallback(() => {
+    setCurrentCharacter(null);
+    setSceneImageUrl('');
+    setMessages([]);
+    chatRef.current = null;
+    setCurrentPage('characterList');
+  }, []);
+
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      if (currentPage === 'chat' && e.state?.page !== 'chat') {
+        handleBackToCharacterList();
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [currentPage, handleBackToCharacterList]);
 
   const handleSendMessage = async (userInput: string) => {
     if (!userInput.trim() || !chatRef.current || isLoading) return;
@@ -200,6 +224,7 @@ const App: React.FC = () => {
       
       setMessages([{ sender: 'ai', text: greeting, emotion: 'happy' }]);
       setCurrentPage('chat');
+      window.history.pushState({ page: 'chat' }, '', '#chat');
     } catch (error) {
       console.error("Error selecting character:", error);
     } finally {
@@ -214,14 +239,6 @@ const App: React.FC = () => {
       const updatedCharacters = characters.filter(c => c.id !== characterId);
       setCharacters(updatedCharacters);
     }
-  };
-
-  const handleBackToCharacterList = () => {
-    setCurrentCharacter(null);
-    setSceneImageUrl('');
-    setMessages([]);
-    chatRef.current = null;
-    setCurrentPage('characterList');
   };
 
   const handleEditCharacter = (character: Character) => {
@@ -258,6 +275,39 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Error saving settings:", error);
       alert('Could not save settings.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveChatSettings = async (newInstruction: string) => {
+    if (!currentCharacter) return;
+
+    if (!window.confirm("Saving new instructions will reset the current chat to apply them. Continue?")) {
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingMessage('Applying new settings...');
+
+    const updatedCharacter = { ...currentCharacter, systemInstruction: newInstruction.trim() ? newInstruction.trim() : undefined };
+
+    try {
+      await saveCharacter(updatedCharacter);
+
+      setCurrentCharacter(updatedCharacter);
+      setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
+
+      initializeChat(updatedCharacter, userName, userPersonality);
+
+      setLoadingMessage('Character is thinking of a new greeting...');
+      const greeting = await generateGreeting(updatedCharacter, userName, userPersonality);
+      setMessages([{ sender: 'ai', text: greeting, emotion: 'happy' }]);
+
+      setShowChatSettings(false);
+    } catch (error) {
+      console.error("Error saving chat settings:", error);
+      alert("Failed to save settings.");
     } finally {
       setIsLoading(false);
     }
@@ -338,6 +388,15 @@ const App: React.FC = () => {
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
         {isLoading && <LoadingOverlay message={loadingMessage} />}
         {showSettings && <SettingsModal currentName={userName} currentPersonality={userPersonality} currentApiKey={apiKey} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}
+        {showChatSettings && currentCharacter && (
+          <ChatSettingsModal
+            characterName={currentCharacter.name}
+            currentInstruction={currentCharacter.systemInstruction || ''}
+            defaultInstruction={getDefaultSystemInstruction(currentCharacter, userName, userPersonality)}
+            onSave={handleSaveChatSettings}
+            onClose={() => setShowChatSettings(false)}
+          />
+        )}
         
         {showCreator && (
           <CharacterCreator
@@ -367,7 +426,8 @@ const App: React.FC = () => {
             onSendMessage={handleSendMessage}
             onGenerateScene={handleGenerateScene}
             onUploadScene={handleSetSceneFromUpload}
-            onBack={handleBackToCharacterList}
+            onBack={() => window.history.back()}
+            onShowSettings={() => setShowChatSettings(true)}
             onSaveTransform={handleSaveTransform}
             isLoading={isLoading}
           />

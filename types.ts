@@ -7,6 +7,7 @@ export interface Character {
   visualDescription: string;
   sprites: Record<Emotion, string>;
   sceneImageUrl?: string; // Character-specific background scene
+  systemInstruction?: string; // Custom system instruction for the AI
   transform?: {
     x: number;
     y: number;

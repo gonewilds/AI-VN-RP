@@ -25,6 +25,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
   const [sceneImageUrl, setSceneImageUrl] = useState<string | undefined>(undefined);
+  const [systemInstruction, setSystemInstruction] = useState<string | undefined>(undefined);
   
   // State for AI creation
   const [aiVisualDescription, setAiVisualDescription] = useState('');
@@ -39,6 +40,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
       setAiVisualDescription(characterToEdit.visualDescription);
       setSprites(characterToEdit.sprites);
       setSceneImageUrl(characterToEdit.sceneImageUrl);
+      setSystemInstruction(characterToEdit.systemInstruction);
     }
   }, [isEditMode, characterToEdit]);
 
@@ -50,11 +52,12 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
         personality,
         visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
         sceneImageUrl,
+        systemInstruction,
         transform: characterToEdit?.transform, // Preserve existing transform
     };
 
     if (mode === 'ai') {
-        if (name.trim() && personality.trim() && aiVisualDescription.trim()) {
+        if (isAiFormValid) {
             onSave(commonData);
         }
     } else { // upload mode
@@ -170,6 +173,17 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
               </div>
             </div>
           )}
+
+          <div>
+              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Custom System Instructions (Advanced)</h3>
+              <textarea 
+                value={systemInstruction || ''}
+                onChange={(e) => setSystemInstruction(e.target.value)}
+                rows={4}
+                className="mt-2 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-sm"
+                placeholder="Leave blank to use default instructions based on personality. Or, provide your own detailed instructions for the AI character."
+              />
+          </div>
           
           {/* Scene Uploader */}
            <div>
