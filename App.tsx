@@ -81,6 +81,18 @@ const App: React.FC = () => {
     
     loadData();
   }, []);
+
+  useEffect(() => {
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+      const setHeight = () => {
+        appContainer.style.height = `${window.innerHeight}px`;
+      };
+      window.addEventListener('resize', setHeight);
+      setHeight(); // Set initial height
+      return () => window.removeEventListener('resize', setHeight);
+    }
+  }, []);
   
   const getDefaultSystemInstruction = (char: Character, currentUserName: string, currentUserPersonality: string): string => {
     return `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
@@ -384,7 +396,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen bg-black flex justify-center items-center overflow-hidden">
+    <div id="app-container" className="w-screen bg-black flex justify-center items-center overflow-hidden">
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
         {isLoading && <LoadingOverlay message={loadingMessage} />}
         {showSettings && <SettingsModal currentName={userName} currentPersonality={userPersonality} currentApiKey={apiKey} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}

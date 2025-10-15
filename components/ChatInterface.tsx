@@ -113,6 +113,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         style={{ backgroundImage: `url(${sceneImageUrl})` }}
       />
       
+      <div className="absolute top-4 right-4 z-20 flex items-center space-x-2">
+         <button 
+           onClick={() => setIsMenuOpen(!isMenuOpen)}
+           className="flex-shrink-0 bg-black bg-opacity-50 hover:bg-opacity-75 text-white font-bold p-2.5 rounded-full transition-all duration-300 transform hover:scale-110"
+           aria-label="Menu"
+         >
+           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+             <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+           </svg>
+         </button>
+         <button 
+           onClick={toggleFullScreen}
+           className="flex-shrink-0 bg-black bg-opacity-50 hover:bg-opacity-75 text-white font-bold p-2.5 rounded-full transition-all duration-300 transform hover:scale-110"
+           aria-label={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+              {isFullScreen ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v2.586l2.293-2.293a1 1 0 111.414 1.414L12.414 8H15a1 1 0 110 2h-2.586l2.293 2.293a1 1 0 01-1.414 1.414L11 11.414V14a1 1 0 11-2 0v-2.586l-2.293 2.293a1 1 0 01-1.414-1.414L7.586 10H5a1 1 0 110-2h2.586L5.293 5.707a1 1 0 011.414-1.414L9 6.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+              ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h2V3a1 1 0 112 0v2h2a1 1 0 110 2H8v2a1 1 0 11-2 0V7H4a1 1 0 01-1-1zm14 2a1 1 0 01-1 1h-2v2a1 1 0 11-2 0V8h-2a1 1 0 110-2h2V4a1 1 0 112 0v2h2a1 1 0 011 1zm-8 6a1 1 0 011 1v2h2a1 1 0 110 2h-2v2a1 1 0 11-2 0v-2H7a1 1 0 110-2h2v-2a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+              )}
+          </button>
+          <button
+              onClick={onShowSettings}
+              className="flex-shrink-0 bg-black bg-opacity-50 hover:bg-opacity-75 text-white font-bold p-2.5 rounded-full transition-all duration-300 transform hover:scale-110"
+              aria-label="Chat Settings"
+          >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+              </svg>
+          </button>
+      </div>
+
       <div className="flex-grow flex justify-center items-end pb-40 overflow-hidden">
         <CharacterSprite character={character} emotion={currentEmotion || 'neutral'} transform={spriteTransform} />
       </div>
@@ -121,40 +157,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <DialogueBox messages={messages} characterName={character.name} />
 
         <div className="mt-2 flex items-center space-x-2">
-           <button 
-             onClick={() => setIsMenuOpen(!isMenuOpen)}
-             className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white font-bold p-2.5 rounded-full transition-transform duration-300 transform hover:scale-110"
-             aria-label="Menu"
-           >
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-               <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-             </svg>
-           </button>
-           <button 
-             onClick={toggleFullScreen}
-             className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white font-bold p-2.5 rounded-full transition-transform duration-300 transform hover:scale-110"
-             aria-label={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-            >
-                {isFullScreen ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v2.586l2.293-2.293a1 1 0 111.414 1.414L12.414 8H15a1 1 0 110 2h-2.586l2.293 2.293a1 1 0 01-1.414 1.414L11 11.414V14a1 1 0 11-2 0v-2.586l-2.293 2.293a1 1 0 01-1.414-1.414L7.586 10H5a1 1 0 110-2h2.586L5.293 5.707a1 1 0 011.414-1.414L9 6.586V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M3 5a1 1 0 011-1h2V3a1 1 0 112 0v2h2a1 1 0 110 2H8v2a1 1 0 11-2 0V7H4a1 1 0 01-1-1zm14 2a1 1 0 01-1 1h-2v2a1 1 0 11-2 0V8h-2a1 1 0 110-2h2V4a1 1 0 112 0v2h2a1 1 0 011 1zm-8 6a1 1 0 011 1v2h2a1 1 0 110 2h-2v2a1 1 0 11-2 0v-2H7a1 1 0 110-2h2v-2a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                )}
-            </button>
-            <button
-                onClick={onShowSettings}
-                className="flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white font-bold p-2.5 rounded-full transition-transform duration-300 transform hover:scale-110"
-                aria-label="Chat Settings"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                </svg>
-            </button>
-          
           <input
             type="text"
             value={userInput}
@@ -181,7 +183,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       {isMenuOpen && (
         <div 
-          className="absolute top-2 left-2 bg-black bg-opacity-80 p-2 rounded-lg shadow-lg border border-purple-500 z-20 space-y-1"
+          className="absolute top-16 right-4 bg-black bg-opacity-80 p-2 rounded-lg shadow-lg border border-purple-500 z-20 space-y-1"
         >
           <button onClick={handleUploadClick} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             Upload Scene
