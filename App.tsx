@@ -267,6 +267,23 @@ const App: React.FC = () => {
     setSceneImageUrl(dataUrl);
     setMessages(prev => [...prev, { sender: 'system', text: 'Scene updated from uploaded image.' }]);
   };
+
+  const handleSaveTransform = async (characterId: string, transform: { x: number; y: number; scale: number; }) => {
+    const characterToUpdate = characters.find(c => c.id === characterId);
+    if (characterToUpdate) {
+      const updatedCharacter = { ...characterToUpdate, transform };
+      
+      // Update state
+      const updatedCharacters = characters.map(c => c.id === characterId ? updatedCharacter : c);
+      setCharacters(updatedCharacters);
+      if (currentCharacter?.id === characterId) {
+        setCurrentCharacter(updatedCharacter);
+      }
+
+      // Save to DB
+      await saveCharacter(updatedCharacter);
+    }
+  };
   
   return (
     <div className="w-screen h-screen bg-black flex justify-center items-center overflow-hidden">
@@ -302,6 +319,7 @@ const App: React.FC = () => {
             onGenerateScene={handleGenerateScene}
             onUploadScene={handleSetSceneFromUpload}
             onBack={handleBackToCharacterList}
+            onSaveTransform={handleSaveTransform}
             isLoading={isLoading}
           />
         )}

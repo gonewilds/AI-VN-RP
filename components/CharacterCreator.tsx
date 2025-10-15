@@ -45,11 +45,12 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const commonData = {
+    const commonData: Omit<Character, 'id' | 'sprites'> = {
         name,
         personality,
         visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
         sceneImageUrl,
+        transform: characterToEdit?.transform, // Preserve existing transform
     };
 
     if (mode === 'ai') {

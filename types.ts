@@ -7,6 +7,11 @@ export interface Character {
   visualDescription: string;
   sprites: Record<Emotion, string>;
   sceneImageUrl?: string; // Character-specific background scene
+  transform?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
 }
 
 export interface Message {

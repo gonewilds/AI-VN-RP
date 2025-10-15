@@ -5,9 +5,14 @@ import type { Character, Emotion } from '../types';
 interface CharacterSpriteProps {
   character: Character;
   emotion: Emotion;
+  transform?: {
+    x: number;
+    y: number;
+    scale: number;
+  };
 }
 
-const CharacterSprite: React.FC<CharacterSpriteProps> = ({ character, emotion }) => {
+const CharacterSprite: React.FC<CharacterSpriteProps> = ({ character, emotion, transform }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(character.sprites[emotion]);
   const [isFading, setIsFading] = useState<boolean>(false);
 
@@ -24,8 +29,16 @@ const CharacterSprite: React.FC<CharacterSpriteProps> = ({ character, emotion })
 
   if (!currentUrl) return null;
 
+  const transformStyle = {
+    transform: `translate(${transform?.x || 0}%, ${transform?.y || 0}%) scale(${transform?.scale || 1})`,
+    transition: 'transform 0.2s ease-out, opacity 0.5s ease-in-out',
+  };
+
   return (
-    <div className="w-2/3 md:w-1/2 max-w-sm h-auto relative">
+    <div 
+      className="w-2/3 md:w-1/2 max-w-sm h-auto relative"
+      style={transformStyle}
+    >
       <img
         src={currentUrl}
         alt={`${character.name} - ${emotion}`}

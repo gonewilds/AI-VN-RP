@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Character, Message } from '../types';
 import DialogueBox from './DialogueBox';
 import CharacterSprite from './CharacterSprite';
+import TransformControls from './TransformControls';
 
 interface ChatInterfaceProps {
   character: Character;
@@ -11,6 +12,7 @@ interface ChatInterfaceProps {
   onGenerateScene: (prompt: string) => void;
   onUploadScene: (dataUrl: string) => void;
   onBack: () => void;
+  onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
   isLoading: boolean;
 }
 
@@ -31,13 +33,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onGenerateScene,
   onUploadScene,
   onBack,
+  onSaveTransform,
   isLoading
 }) => {
   const [userInput, setUserInput] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showTransformControls, setShowTransformControls] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastMessage = messages[messages.length - 1];
   const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : 'neutral';
+
+  const [spriteTransform, setSpriteTransform] = useState(character.transform || { x: 0, y: 0, scale: 1 });
+
+  useEffect(() => {
+    setSpriteTransform(character.transform || { x: 0, y: 0, scale: 1 });
+  }, [character.transform]);
+
   
   const handleSend = () => {
     if (userInput.startsWith('/scene ')) {
@@ -67,6 +78,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleSaveTransform = () => {
+    onSaveTransform(character.id, spriteTransform);
+    setShowTransformControls(false);
+    setIsMenuOpen(false);
+  };
+
   return (
     <div className="relative w-full h-full overflow-hidden flex flex-col bg-gray-800">
       <div
@@ -74,8 +91,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         style={{ backgroundImage: `url(${sceneImageUrl})` }}
       />
       
-      <div className="flex-grow flex justify-center items-end pb-40">
-        <CharacterSprite character={character} emotion={currentEmotion || 'neutral'} />
+      <div className="flex-grow flex justify-center items-end pb-40 overflow-hidden">
+        <CharacterSprite character={character} emotion={currentEmotion || 'neutral'} transform={spriteTransform} />
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">
@@ -115,6 +132,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </button>
         </div>
       </div>
+
       {isMenuOpen && (
         <div 
           className="absolute top-2 left-2 bg-black bg-opacity-80 p-2 rounded-lg shadow-lg border border-purple-500 z-20 space-y-1"
@@ -122,11 +140,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <button onClick={handleUploadClick} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             Upload Scene
           </button>
+          <button onClick={() => { setShowTransformControls(true); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
+            Adjust Position
+          </button>
           <button onClick={() => { onBack(); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             Change Character
           </button>
         </div>
       )}
+
+      {showTransformControls && (
+        <TransformControls 
+          transform={spriteTransform}
+          setTransform={setSpriteTransform}
+          onSave={handleSaveTransform}
+          onCancel={() => {
+            setShowTransformControls(false);
+            setSpriteTransform(character.transform || { x: 0, y: 0, scale: 1 });
+          }}
+        />
+      )}
+
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg" className="hidden" />
     </div>
   );
