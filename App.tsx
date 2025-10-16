@@ -7,8 +7,7 @@ import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
 import SettingsModal from './components/SettingsModal';
-import ChatSettingsModal from './components/ChatSettingsModal';
-import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI } from './services/geminiService';
+import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
 import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting } from './services/dbService';
 
 const App: React.FC = () => {
@@ -24,7 +23,6 @@ const App: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>('Initializing App...');
   const [showCreator, setShowCreator] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [showChatSettings, setShowChatSettings] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'characterList' | 'chat'>('characterList');
 
   const chatRef = useRef<Chat | null>(null);
@@ -149,7 +147,7 @@ const App: React.FC = () => {
     }
     const ai = getAI();
 
-    const systemInstruction = char.systemInstruction || getDefaultSystemInstruction(char, currentUserName, currentUserPersonality);
+    const systemInstruction = getDefaultSystemInstruction(char, currentUserName, currentUserPersonality);
 
     chatRef.current = ai.chats.create({
       model: 'gemini-2.5-flash',
@@ -342,39 +340,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveChatSettings = async (newInstruction: string) => {
-    if (!currentCharacter) return;
-
-    if (!window.confirm("Saving new instructions will reset the current chat to apply them. Continue?")) {
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadingMessage('Applying new settings...');
-
-    const updatedCharacter = { ...currentCharacter, systemInstruction: newInstruction.trim() ? newInstruction.trim() : undefined };
-
-    try {
-      await saveCharacter(updatedCharacter);
-
-      setCurrentCharacter(updatedCharacter);
-      setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
-
-      initializeChat(updatedCharacter, userName, userPersonality);
-
-      setLoadingMessage('Character is thinking of a new greeting...');
-      const greeting = await generateGreeting(updatedCharacter, userName, userPersonality);
-      setMessages([{ sender: 'ai', text: greeting, emotion: 'happy' }]);
-
-      setShowChatSettings(false);
-    } catch (error) {
-      console.error("Error saving chat settings:", error);
-      alert("Failed to save settings.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSetSceneFromUpload = (dataUrl: string) => {
     setSceneImageUrl(dataUrl);
     setMessages(prev => [...prev, { sender: 'system', text: 'Scene updated from uploaded image.' }]);
@@ -397,19 +362,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateIndicator = async (newValue: number) => {
-    if (!currentCharacter) return;
-    const newIndicatorValue = Math.max(0, Math.min(100, newValue));
-    const updatedCharacter = { ...currentCharacter, indicator: { ...currentCharacter.indicator, value: newIndicatorValue } };
-    
-    setCurrentCharacter(updatedCharacter);
-    await saveCharacter(updatedCharacter);
-    setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
-    
-    setMessages(prev => [...prev, { sender: 'system', text: `${updatedCharacter.indicator.name} has been set to ${newIndicatorValue}.` }]);
-    
-    // Re-initialize chat with new indicator value in context
-    initializeChat(updatedCharacter, userName, userPersonality);
+  const handleGenerateImpersonation = async (character: Character, currentMessages: Message[]): Promise<string[]> => {
+      if (!isAIInitialized()) {
+        alert("API Key is not configured.");
+        return [];
+      }
+      return await generateImpersonatedResponses(character, currentMessages, userName, userPersonality);
   };
   
   const handleImportCharacters = async (importedData: any) => {
@@ -467,15 +425,6 @@ const App: React.FC = () => {
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
         {isLoading && <LoadingOverlay message={loadingMessage} />}
         {showSettings && <SettingsModal currentName={userName} currentPersonality={userPersonality} currentApiKey={apiKey} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}
-        {showChatSettings && currentCharacter && (
-          <ChatSettingsModal
-            characterName={currentCharacter.name}
-            currentInstruction={currentCharacter.systemInstruction || ''}
-            defaultInstruction={getDefaultSystemInstruction(currentCharacter, userName, userPersonality)}
-            onSave={handleSaveChatSettings}
-            onClose={() => setShowChatSettings(false)}
-          />
-        )}
         
         {showCreator && (
           <CharacterCreator
@@ -506,9 +455,8 @@ const App: React.FC = () => {
             onGenerateScene={handleGenerateScene}
             onUploadScene={handleSetSceneFromUpload}
             onBack={() => window.history.back()}
-            onShowSettings={() => setShowChatSettings(true)}
             onSaveTransform={handleSaveTransform}
-            onUpdateIndicator={handleUpdateIndicator}
+            onGenerateImpersonation={handleGenerateImpersonation}
             isLoading={isLoading}
           />
         )}

@@ -1,5 +1,5 @@
-import { GoogleGenAI, Chat, GenerateContentResponse } from '@google/genai';
-import type { Character } from '../types';
+import { GoogleGenAI, Chat, GenerateContentResponse, Type } from '@google/genai';
+import type { Character, Message } from '../types';
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -98,5 +98,51 @@ export const generateGreeting = async (character: Pick<Character, 'personality'>
   } catch (error) {
     console.error('Error generating greeting:', error);
     return `Hello ${userName}, it's nice to meet you.`; // Fallback greeting
+  }
+};
+
+export const generateImpersonatedResponses = async (
+  character: Character, 
+  messages: Message[], 
+  userName: string, 
+  userPersonality: string
+): Promise<string[]> => {
+  const ai = getAI();
+  const history = messages.slice(-6).map(m => `${m.sender === 'ai' ? character.name : userName}: ${m.text}`).join('\n');
+  const systemInstruction = `You are an AI assistant helping a user roleplay. Your task is to impersonate the user and suggest two different responses for them to say next.
+The user's name is "${userName}" and their personality is: ${userPersonality || 'not specified'}.
+They are talking to "${character.name}" whose personality is: ${character.personality}.
+The last message was from ${character.name}.
+Based on the recent chat history, generate two distinct, creative, and in-character responses from ${userName}'s perspective.
+The responses should be concise and sound like natural dialogue.
+
+Recent Chat History:
+${history}
+
+Your response must be a valid JSON array containing exactly two strings. Example: ["That sounds interesting!", "I'm not so sure about that."]"`;
+
+  try {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: 'Generate two responses.',
+        config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            }
+        }
+    });
+
+    const jsonText = response.text.trim();
+    const parsedResponse = JSON.parse(jsonText);
+    if (Array.isArray(parsedResponse) && parsedResponse.length >= 2 && parsedResponse.every(item => typeof item === 'string')) {
+      return parsedResponse.slice(0, 2);
+    }
+    throw new Error('Invalid JSON structure for impersonation.');
+  } catch (error) {
+    console.error('Error generating impersonated responses:', error);
+    return ["Let's try something else.", "What should I say?"]; // Fallback
   }
 };

@@ -13,9 +13,8 @@ interface ChatInterfaceProps {
   onGenerateScene: (prompt: string) => void;
   onUploadScene: (dataUrl: string) => void;
   onBack: () => void;
-  onShowSettings: () => void;
   onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
-  onUpdateIndicator: (newValue: number) => void;
+  onGenerateImpersonation: (character: Character, messages: Message[]) => Promise<string[]>;
   isLoading: boolean;
 }
 
@@ -36,15 +35,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onGenerateScene,
   onUploadScene,
   onBack,
-  onShowSettings,
   onSaveTransform,
-  onUpdateIndicator,
+  onGenerateImpersonation,
   isLoading
 }) => {
   const [userInput, setUserInput] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showTransformControls, setShowTransformControls] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(!!document.fullscreenElement);
+  const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
+  const [isImpersonating, setIsImpersonating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastMessage = messages[messages.length - 1];
   const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : (character.emotions[0] || 'neutral');
@@ -83,6 +83,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       onSendMessage(userInput);
     }
     setUserInput('');
+    setSuggestedResponses([]);
+  };
+
+  const handleImpersonate = async () => {
+    if (isLoading || isImpersonating) return;
+    setIsImpersonating(true);
+    setSuggestedResponses([]);
+    try {
+      const suggestions = await onGenerateImpersonation(character, messages);
+      setSuggestedResponses(suggestions);
+    } catch (error) {
+      console.error("Failed to generate impersonation", error);
+    } finally {
+      setIsImpersonating(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setUserInput(suggestion);
+    setSuggestedResponses([]);
   };
 
   const handleUploadClick = () => {
@@ -119,7 +139,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <IndicatorMeter 
         name={character.indicator.name}
         value={character.indicator.value}
-        onUpdate={onUpdateIndicator}
       />
       
       <div className="absolute top-2 right-2 z-10 flex items-center space-x-2">
@@ -138,15 +157,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   </svg>
               )}
           </button>
-          <button
-              onClick={onShowSettings}
-              className="flex-shrink-0 bg-black bg-opacity-40 hover:bg-opacity-60 text-white font-bold p-2.5 rounded-full transition-all"
-              aria-label="Chat Settings"
-          >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-1.57 1.996A1.532 1.532 0 013.17 7.49c-1.56.38-1.56 2.6 0 2.98a1.532 1.532 0 01.948 2.286c-.836 1.372.734 2.942 1.996 1.57A1.532 1.532 0 017.49 16.83c.38 1.56 2.6 1.56 2.98 0a1.532 1.532 0 012.286-.948c1.372.836 2.942-.734 1.57-1.996A1.532 1.532 0 0116.83 12.51c1.56-.38 1.56-2.6 0-2.98a1.532 1.532 0 01-.948-2.286c.836-1.372-.734-2.942-1.996-1.57A1.532 1.532 0 0112.51 3.17zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-              </svg>
-          </button>
          <button 
            onClick={() => setIsMenuOpen(!isMenuOpen)}
            className="flex-shrink-0 bg-black bg-opacity-40 hover:bg-opacity-60 text-white font-bold p-2.5 rounded-full transition-all"
@@ -164,8 +174,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">
         <DialogueBox messages={messages} characterName={character.name} />
+        
+        {suggestedResponses.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2 justify-center">
+            {suggestedResponses.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="px-3 py-1.5 bg-purple-600 bg-opacity-80 text-white text-sm rounded-full hover:bg-opacity-100 transition-all text-left"
+              >
+                "{suggestion}"
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mt-2 flex items-center space-x-2">
+           <button
+            onClick={handleImpersonate}
+            disabled={isLoading || isImpersonating}
+            className="flex-shrink-0 bg-yellow-500 text-white font-bold p-3 rounded-lg hover:bg-yellow-600 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
+            aria-label="Get response suggestions"
+            title="Get response suggestions"
+          >
+             {isImpersonating ? (
+                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                 </svg>
+             ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 14.95a1 1 0 001.414 1.414l.707-.707a1 1 0 00-1.414-1.414l-.707.707zM10 16a1 1 0 011-1h-2a1 1 0 011 1zM4.343 5.757a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM2 10a1 1 0 011-1h1a1 1 0 110 2H3a1 1 0 01-1-1zM14.95 14.95a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707z" />
+                  <path d="M10 6a4 4 0 100 8 4 4 0 000-8z" />
+                </svg>
+             )}
+          </button>
           <input
             type="text"
             value={userInput}
@@ -180,7 +223,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             disabled={isLoading || !userInput.trim()}
             className="flex-shrink-0 bg-pink-500 text-white font-bold p-3 rounded-lg hover:bg-pink-600 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
           >
-             {isLoading ? (
+             {isLoading && !isImpersonating ? (
                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

@@ -6,7 +6,6 @@ export interface Character {
   emotions: string[];
   sprites: Record<string, string>;
   sceneImageUrl?: string; // Character-specific background scene
-  systemInstruction?: string; // Custom system instruction for the AI
   transform?: {
     x: number;
     y: number;

@@ -24,7 +24,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
   const [sceneImageUrl, setSceneImageUrl] = useState<string | undefined>(undefined);
-  const [systemInstruction, setSystemInstruction] = useState<string | undefined>(undefined);
   
   // State for AI creation
   const [aiVisualDescription, setAiVisualDescription] = useState('');
@@ -45,7 +44,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
       setEmotions(characterToEdit.emotions);
       setSprites(characterToEdit.sprites);
       setSceneImageUrl(characterToEdit.sceneImageUrl);
-      setSystemInstruction(characterToEdit.systemInstruction);
       setIndicatorName(characterToEdit.indicator.name);
       setIndicatorValue(characterToEdit.indicator.value);
     }
@@ -59,7 +57,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
         personality,
         visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
         sceneImageUrl,
-        systemInstruction,
         transform: characterToEdit?.transform, // Preserve existing transform
         indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue }
     };
@@ -242,17 +239,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
                       <span className="font-mono bg-gray-900 px-2 py-1 rounded-md">{indicatorValue}</span>
                   </div>
               </div>
-          </div>
-
-          <div>
-              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Custom System Instructions (Advanced)</h3>
-              <textarea 
-                value={systemInstruction || ''}
-                onChange={(e) => setSystemInstruction(e.target.value)}
-                rows={3}
-                className="mt-2 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-sm"
-                placeholder="Leave blank to use default instructions. Or, provide your own detailed instructions for the AI character."
-              />
           </div>
           
            <div>
