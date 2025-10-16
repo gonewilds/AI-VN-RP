@@ -64,7 +64,39 @@ const App: React.FC = () => {
           
           setLoadingMessage('Loading characters...');
           const storedCharacters = await getAllCharacters();
-          setCharacters(storedCharacters);
+
+          // Data migration logic for older character models
+          const charactersToUpdate: Character[] = [];
+          const migratedCharacters = storedCharacters.map(char => {
+            let needsUpdate = false;
+            const newChar = { ...char };
+
+            if (!newChar.emotions || !Array.isArray(newChar.emotions) || newChar.emotions.length === 0) {
+              newChar.emotions = Object.keys(newChar.sprites || {});
+              if (newChar.emotions.length === 0) {
+                  newChar.emotions = ['neutral']; // Final fallback
+              }
+              needsUpdate = true;
+            }
+
+            if (!newChar.indicator) {
+              newChar.indicator = { name: 'Affection', value: 50 };
+              needsUpdate = true;
+            }
+            
+            if (needsUpdate) {
+                charactersToUpdate.push(newChar);
+            }
+
+            return newChar;
+          });
+          
+          if (charactersToUpdate.length > 0) {
+            setLoadingMessage('Upgrading character data...');
+            await Promise.all(charactersToUpdate.map(saveCharacter));
+          }
+
+          setCharacters(migratedCharacters);
 
         } else {
           // No API key, prompt user to enter one.
