@@ -29,7 +29,7 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' 
     const fullPrompt = `${prompt}, aspect ratio ${aspectRatio}.`;
     
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-2.0-flash-preview-image-generation',
       contents: {
         parts: [{ text: fullPrompt }],
       },
