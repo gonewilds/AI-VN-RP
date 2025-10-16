@@ -19,6 +19,7 @@ interface ChatInterfaceProps {
   onNewChat: () => void;
   onEditMessage: (messageId: string, newText: string) => void;
   onDeleteMessage: (messageId: string) => void;
+  onShowChatSettings: () => void;
 }
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -44,6 +45,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onNewChat,
   onEditMessage,
   onDeleteMessage,
+  onShowChatSettings,
 }) => {
   const [userInput, setUserInput] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -250,6 +252,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         >
           <button onClick={() => { onNewChat(); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             New Chat
+          </button>
+          <button onClick={() => { onShowChatSettings(); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
+            Chat Settings
           </button>
           <button onClick={handleUploadClick} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             Upload Scene

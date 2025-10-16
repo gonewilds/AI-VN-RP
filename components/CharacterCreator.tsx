@@ -24,6 +24,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
   const [sceneImageUrl, setSceneImageUrl] = useState<string | undefined>(undefined);
+  const [systemInstruction, setSystemInstruction] = useState('');
   
   // State for AI creation
   const [aiVisualDescription, setAiVisualDescription] = useState('');
@@ -46,6 +47,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
       setSceneImageUrl(characterToEdit.sceneImageUrl);
       setIndicatorName(characterToEdit.indicator.name);
       setIndicatorValue(characterToEdit.indicator.value);
+      setSystemInstruction(characterToEdit.systemInstruction || '');
     }
   }, [isEditMode, characterToEdit]);
 
@@ -58,7 +60,8 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
         visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
         sceneImageUrl,
         transform: characterToEdit?.transform, // Preserve existing transform
-        indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue }
+        indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue },
+        systemInstruction: systemInstruction.trim() ? systemInstruction.trim() : undefined,
     };
 
     if (mode === 'ai') {
@@ -259,6 +262,24 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
                     />
               </div>
            </div>
+
+          <details className="bg-gray-900/50 p-3 rounded-lg">
+            <summary className="text-lg font-semibold text-purple-300 cursor-pointer select-none">Advanced: System Instruction</summary>
+            <div className="mt-3">
+              <p className="text-xs text-gray-400 mb-2">
+                This will override the default instructions for this character. Leave empty to use the default. You can use placeholders like {'{{character.name}}'} or {'{{user.name}}'}.
+                <br/>
+                <span className="font-bold text-yellow-400">Warning:</span> For the app to work, the AI's response must be a valid JSON object.
+              </p>
+              <textarea 
+                value={systemInstruction} 
+                onChange={(e) => setSystemInstruction(e.target.value)} 
+                rows={5} 
+                className="block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-sm custom-scrollbar"
+                placeholder="Customize how the AI should behave..."
+              />
+            </div>
+          </details>
 
           <div className="flex justify-end pt-4">
             <button type="submit" className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={mode === 'ai' ? !isAiFormValid : !isUploadFormValid}>

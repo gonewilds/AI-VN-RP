@@ -15,6 +15,7 @@ export interface Character {
     name: string;
     value: number;
   };
+  systemInstruction?: string;
 }
 
 export interface Message {

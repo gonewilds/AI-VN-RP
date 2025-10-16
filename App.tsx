@@ -7,6 +7,7 @@ import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
 import SettingsModal from './components/SettingsModal';
+import ChatSettingsModal from './components/ChatSettingsModal';
 import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
 import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting, getChatHistory, saveChatHistory, deleteChatHistory } from './services/dbService';
 
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>('Initializing App...');
   const [showCreator, setShowCreator] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showChatSettings, setShowChatSettings] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'characterList' | 'chat'>('characterList');
 
   const chatRef = useRef<Chat | null>(null);
@@ -138,14 +140,14 @@ const App: React.FC = () => {
     };
   }, []);
   
-  const getDefaultSystemInstruction = (char: Character, currentUserName: string, currentUserPersonality: string): string => {
-    return `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
-    You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character.
-    You have an indicator called "${char.indicator.name}" which is currently at ${char.indicator.value} (out of 100). Your interactions should influence this value. A positive interaction may increase it, a negative one may decrease it. The value must stay between 0 and 100.
+  const getDefaultSystemInstruction = (): string => {
+    return `You are an AI character in a visual novel. Your name is {{character.name}}. Your personality is described as: {{character.personality}}. 
+    You are talking to a user named {{user.name}} whose personality is: {{user.personality}}. You must always stay in character.
+    You have an indicator called "{{character.indicator.name}}" which is currently at {{character.indicator.value}} (out of 100). Your interactions should influence this value. A positive interaction may increase it, a negative one may decrease it. The value must stay between 0 and 100.
     When you respond, you must determine your current emotion based on the conversation.
-    Your response must be in a valid JSON format with three keys: "dialogue" for what you say, "emotion" for how you feel, and "indicatorValue" for the new value of "${char.indicator.name}".
-    The possible emotions are only: ${char.emotions.join(', ')}.
-    Example: {"dialogue": "Hello there, ${currentUserName}!", "emotion": "happy", "indicatorValue": ${Math.min(100, char.indicator.value + 1)}}`;
+    Your response must be in a valid JSON format with three keys: "dialogue" for what you say, "emotion" for how you feel, and "indicatorValue" for the new value of "{{character.indicator.name}}".
+    The possible emotions are only: {{character.emotions}}.
+    Example: {"dialogue": "Hello there, {{user.name}}!", "emotion": "happy", "indicatorValue": 51}`;
   };
 
   const initializeChat = useCallback((char: Character, history: Message[]) => {
@@ -155,7 +157,18 @@ const App: React.FC = () => {
       return;
     }
     const ai = getAI();
-    const systemInstruction = getDefaultSystemInstruction(char, userName, userPersonality);
+    let systemInstruction = char.systemInstruction || getDefaultSystemInstruction();
+    
+    // Replace placeholders
+    systemInstruction = systemInstruction
+        .replace(/{{character.name}}/g, char.name)
+        .replace(/{{character.personality}}/g, char.personality)
+        .replace(/{{character.indicator.name}}/g, char.indicator.name)
+        .replace(/{{character.indicator.value}}/g, String(char.indicator.value))
+        .replace(/{{character.emotions}}/g, char.emotions.join(', '))
+        .replace(/{{user.name}}/g, userName)
+        .replace(/{{user.personality}}/g, userPersonality || 'not specified');
+
     const geminiHistory = convertMessagesToHistory(history);
 
     chatRef.current = ai.chats.create({
@@ -374,6 +387,35 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveChatSettings = async (newInstruction: string) => {
+      if (!currentCharacter) return;
+
+      setIsLoading(true);
+      setLoadingMessage('Saving settings & restarting chat...');
+      
+      try {
+          const updatedCharacter = { ...currentCharacter, systemInstruction: newInstruction };
+          setCurrentCharacter(updatedCharacter);
+          await saveCharacter(updatedCharacter);
+          setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
+          
+          await deleteChatHistory(currentCharacter.id);
+          
+          initializeChat(updatedCharacter, []);
+          
+          const greeting = await generateGreeting(updatedCharacter, userName, userPersonality);
+          const firstMessage: Message = { id: Date.now().toString(), sender: 'ai', text: greeting, emotion: 'happy' };
+          setMessages([firstMessage]);
+          await saveChatHistory(currentCharacter.id, [firstMessage]);
+      } catch (error) {
+          console.error("Failed to save chat settings:", error);
+          alert("Could not save settings. Please try again.");
+      } finally {
+          setShowChatSettings(false);
+          setIsLoading(false);
+      }
+  };
+
   const handleSetSceneFromUpload = async (dataUrl: string) => {
     setSceneImageUrl(dataUrl);
     const systemMessage: Message = { id: `${Date.now()}-system`, sender: 'system', text: 'Scene updated from uploaded image.' };
@@ -515,6 +557,16 @@ const App: React.FC = () => {
             characterToEdit={editingCharacter}
           />
         )}
+
+        {showChatSettings && currentCharacter && (
+          <ChatSettingsModal
+            character={currentCharacter}
+            currentInstruction={currentCharacter.systemInstruction || ''}
+            defaultInstruction={getDefaultSystemInstruction()}
+            onSave={handleSaveChatSettings}
+            onClose={() => setShowChatSettings(false)}
+          />
+        )}
         
         {!isLoading && !showSettings && apiKey && currentPage === 'characterList' && (
           <CharacterListPage
@@ -543,6 +595,7 @@ const App: React.FC = () => {
             onEditMessage={handleEditMessage}
             onDeleteMessage={handleDeleteMessage}
             isLoading={isLoading}
+            onShowChatSettings={() => setShowChatSettings(true)}
           />
         )}
       </div>
