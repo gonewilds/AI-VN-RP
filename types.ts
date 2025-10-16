@@ -3,6 +3,7 @@ export interface Character {
   name: string;
   personality: string;
   visualDescription: string;
+  greeting?: string;
   emotions: string[];
   sprites: Record<string, string>;
   sceneImageUrl?: string; // Character-specific background scene

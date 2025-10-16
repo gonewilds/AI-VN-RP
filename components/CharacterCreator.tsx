@@ -22,6 +22,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
   const [visualDescription, setVisualDescription] = useState('');
+  const [greeting, setGreeting] = useState('');
   const [sceneImageUrl, setSceneImageUrl] = useState<string | undefined>(undefined);
   const [systemInstruction, setSystemInstruction] = useState('');
   const [emotions, setEmotions] = useState<string[]>(['neutral', 'happy', 'sad']);
@@ -34,6 +35,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
       setName(characterToEdit.name);
       setPersonality(characterToEdit.personality);
       setVisualDescription(characterToEdit.visualDescription);
+      setGreeting(characterToEdit.greeting || '');
       setEmotions(characterToEdit.emotions);
       setSprites(characterToEdit.sprites);
       setSceneImageUrl(characterToEdit.sceneImageUrl);
@@ -52,6 +54,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
             name,
             personality,
             visualDescription,
+            greeting: greeting.trim() ? greeting.trim() : undefined,
             sceneImageUrl,
             transform: characterToEdit?.transform, // Preserve existing transform
             indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue },
@@ -148,6 +151,11 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
            <div>
             <label htmlFor="visual-description" className="block text-sm font-medium text-gray-300">Visual Description (Optional)</label>
             <textarea id="visual-description" value={visualDescription} onChange={(e) => setVisualDescription(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="Notes about the character's appearance..." />
+          </div>
+          
+          <div>
+            <label htmlFor="char-greeting" className="block text-sm font-medium text-gray-300">Greeting Message (Optional)</label>
+            <textarea id="char-greeting" value={greeting} onChange={(e) => setGreeting(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="The first thing this character says to the user. If empty, a generic greeting will be used." />
           </div>
 
           <div className="space-y-4">

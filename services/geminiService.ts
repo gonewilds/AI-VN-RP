@@ -52,29 +52,6 @@ export const getAIResponse = async (chat: Chat, userInput: string): Promise<{ di
   }
 };
 
-export const generateGreeting = async (character: Pick<Character, 'personality'>, userName: string, userPersonality: string): Promise<string> => {
-  const ai = getAI();
-  try {
-    const systemInstruction = `You are roleplaying a character with this personality: ${character.personality}. 
-    You are greeting a user named ${userName}, whose personality is: ${userPersonality || 'not specified'}.
-    Generate a short, friendly, in-character greeting directed at the user.
-    Do not add any quotation marks or extra formatting. Just provide the line of dialogue.`;
-    
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Generate a greeting for ${userName}.`,
-        config: {
-            systemInstruction,
-        }
-    });
-    
-    return response.text.trim();
-  } catch (error) {
-    console.error('Error generating greeting:', error);
-    return `Hello ${userName}, it's nice to meet you.`; // Fallback greeting
-  }
-};
-
 export const generateImpersonatedResponses = async (
   character: Character, 
   messages: Message[], 

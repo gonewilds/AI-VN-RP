@@ -8,7 +8,7 @@ import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
 import SettingsModal from './components/SettingsModal';
 import ChatSettingsModal from './components/ChatSettingsModal';
-import { getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
+import { getAIResponse, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
 import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting, getChatHistory, saveChatHistory, deleteChatHistory } from './services/dbService';
 
 const convertMessagesToHistory = (messages: Message[]): Content[] => {
@@ -197,22 +197,25 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', onPopState);
   }, [currentPage, handleBackToCharacterList]);
 
-  const handleSendMessage = async (userInput: string) => {
+  const handleSendMessage = async (userInput: string, isRegeneration = false) => {
     if (!userInput.trim() || !chatRef.current || isLoading || !currentCharacter) return;
 
-    const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
-    const newMessagesAfterUser = [...messages, userMessage];
-    setMessages(newMessagesAfterUser);
-    await saveChatHistory(currentCharacter.id, newMessagesAfterUser);
+    let messagesForAI = [...messages];
+    if (!isRegeneration) {
+        const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
+        messagesForAI = [...messages, userMessage];
+        setMessages(messagesForAI);
+        await saveChatHistory(currentCharacter.id, messagesForAI);
+    }
     
     setIsLoading(true);
-    setLoadingMessage('Thinking...');
+    setLoadingMessage(isRegeneration ? 'Regenerating...' : 'Thinking...');
 
     try {
       const { dialogue, emotion, indicatorValue } = await getAIResponse(chatRef.current, userInput);
       const aiMessage: Message = { id: `${Date.now()}-ai`, sender: 'ai', text: dialogue, emotion: emotion || currentCharacter.emotions[0] || 'neutral' };
       
-      const finalMessages = [...newMessagesAfterUser, aiMessage];
+      const finalMessages = [...messagesForAI, aiMessage];
       setMessages(finalMessages);
       await saveChatHistory(currentCharacter.id, finalMessages);
 
@@ -227,12 +230,34 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Error getting AI response:", error);
       const errorMessage: Message = { id: `${Date.now()}-system`, sender: 'system', text: 'Sorry, I encountered an error. Please try again.' };
-      const finalMessages = [...newMessagesAfterUser, errorMessage];
+      const finalMessages = [...messagesForAI, errorMessage];
       setMessages(finalMessages);
       await saveChatHistory(currentCharacter.id, finalMessages);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRegenerate = async () => {
+    if (isLoading || !currentCharacter) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.sender !== 'ai') return;
+
+    const messagesWithoutLastAI = messages.slice(0, -1);
+    const lastUserMessage = messagesWithoutLastAI.findLast(m => m.sender === 'user');
+
+    if (!lastUserMessage) {
+        alert("Cannot regenerate the initial greeting.");
+        return; 
+    }
+    
+    setMessages(messagesWithoutLastAI);
+    await saveChatHistory(currentCharacter.id, messagesWithoutLastAI);
+    
+    initializeChat(currentCharacter, messagesWithoutLastAI);
+    
+    await handleSendMessage(lastUserMessage.text, true);
   };
 
   const handleSaveCharacter = async (data: Omit<Character, 'id' | 'sprites'>, sprites: Record<string, string>) => {
@@ -276,14 +301,15 @@ const App: React.FC = () => {
         setSceneImageUrl(DEFAULT_SCENE_URL);
       }
 
-      if (history) {
+      if (history && history.length > 0) {
         setMessages(history);
       } else {
-        setLoadingMessage('Character is thinking of a greeting...');
-        const greeting = await generateGreeting(character, userName, userPersonality);
+        const greeting = character.greeting || `Hello, ${userName}.`;
         const firstMessage: Message = { id: Date.now().toString(), sender: 'ai', text: greeting, emotion: 'happy' };
         setMessages([firstMessage]);
         await saveChatHistory(character.id, [firstMessage]);
+        // Re-initialize chat with the greeting in history.
+        initializeChat(character, [firstMessage]);
       }
       
       setCurrentPage('chat');
@@ -358,12 +384,12 @@ const App: React.FC = () => {
           
           await deleteChatHistory(currentCharacter.id);
           
-          initializeChat(updatedCharacter, []);
-          
-          const greeting = await generateGreeting(updatedCharacter, userName, userPersonality);
+          const greeting = updatedCharacter.greeting || `Hello, ${userName}.`;
           const firstMessage: Message = { id: Date.now().toString(), sender: 'ai', text: greeting, emotion: 'happy' };
           setMessages([firstMessage]);
-          await saveChatHistory(currentCharacter.id, [firstMessage]);
+          await saveChatHistory(updatedCharacter.id, [firstMessage]);
+          
+          initializeChat(updatedCharacter, [firstMessage]);
       } catch (error) {
           console.error("Failed to save chat settings:", error);
           alert("Could not save settings. Please try again.");
@@ -456,11 +482,11 @@ const App: React.FC = () => {
 
     try {
         await deleteChatHistory(currentCharacter.id);
-        initializeChat(currentCharacter, []);
-        const greeting = await generateGreeting(currentCharacter, userName, userPersonality);
+        const greeting = currentCharacter.greeting || `Hello, ${userName}.`;
         const firstMessage: Message = { id: Date.now().toString(), sender: 'ai', text: greeting, emotion: 'happy' };
         setMessages([firstMessage]);
         await saveChatHistory(currentCharacter.id, [firstMessage]);
+        initializeChat(currentCharacter, [firstMessage]);
     } catch (error) {
         console.error("Failed to start new chat:", error);
         alert("Could not start a new chat. Please try again.");
@@ -551,6 +577,7 @@ const App: React.FC = () => {
             onBack={() => window.history.back()}
             onSaveTransform={handleSaveTransform}
             onGenerateImpersonation={handleGenerateImpersonation}
+            onRegenerate={handleRegenerate}
             onNewChat={handleNewChat}
             onEditMessage={handleEditMessage}
             onDeleteMessage={handleDeleteMessage}

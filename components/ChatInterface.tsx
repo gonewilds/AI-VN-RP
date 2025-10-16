@@ -14,6 +14,7 @@ interface ChatInterfaceProps {
   onBack: () => void;
   onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
   onGenerateImpersonation: (character: Character, messages: Message[]) => Promise<string[]>;
+  onRegenerate: () => void;
   isLoading: boolean;
   onNewChat: () => void;
   onEditMessage: (messageId: string, newText: string) => void;
@@ -45,6 +46,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onBack,
   onSaveTransform,
   onGenerateImpersonation,
+  onRegenerate,
   isLoading,
   onNewChat,
   onEditMessage,
@@ -64,6 +66,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : (character.emotions[0] || 'neutral');
 
   const [spriteTransform, setSpriteTransform] = useState(character.transform || { x: 0, y: 0, scale: 1 });
+
+  const canRegenerate = !isLoading && !isImpersonating && messages.length > 0 && messages[messages.length - 1]?.sender === 'ai' && messages.slice(0, -1).some(m => m.sender === 'user');
 
   useEffect(() => {
     setSpriteTransform(character.transform || { x: 0, y: 0, scale: 1 });
@@ -245,6 +249,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <path d="M10 6a4 4 0 100 8 4 4 0 000-8z" />
                 </svg>
              )}
+          </button>
+          <button
+            onClick={onRegenerate}
+            disabled={!canRegenerate}
+            className="flex-shrink-0 bg-blue-500 text-white font-bold p-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed transition-all"
+            aria-label="Regenerate last response"
+            title="Regenerate last response"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+            </svg>
           </button>
           <input
             type="text"
