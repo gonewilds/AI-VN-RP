@@ -1,18 +1,54 @@
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Message } from '../types';
 
 interface DialogueBoxProps {
   messages: Message[];
   characterName: string;
+  onEditMessage: (messageId: string, newText: string) => void;
+  onDeleteMessage: (messageId: string) => void;
 }
 
-const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName }) => {
-  const lastMessageRef = useRef<HTMLDivElement>(null);
-  const lastMessage = messages[messages.length - 1];
+const MessageActions: React.FC<{ message: Message; onEdit: () => void; onDelete: () => void; }> = ({ message, onEdit, onDelete }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    lastMessageRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button onClick={() => setIsOpen(!isOpen)} className="text-gray-400 hover:text-white p-1 rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="absolute bottom-full right-0 mb-1 w-28 bg-gray-900 border border-purple-500 rounded-md shadow-lg z-10 text-sm">
+          {message.sender === 'user' && (
+            <button onClick={() => { onEdit(); setIsOpen(false); }} className="block w-full text-left px-3 py-1.5 text-white hover:bg-purple-700 rounded-t-md">Edit</button>
+          )}
+          <button onClick={() => { onDelete(); setIsOpen(false); }} className="block w-full text-left px-3 py-1.5 text-white hover:bg-purple-700 rounded-b-md">Delete</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEditMessage, onDeleteMessage }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const getDisplayName = (sender: 'ai' | 'user' | 'system') => {
@@ -28,19 +64,39 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName }) =>
   }
 
   return (
-    <div className="h-40 sm:h-48 bg-black bg-opacity-70 p-4 rounded-lg border-2 border-purple-400 overflow-y-auto custom-scrollbar">
-      {messages.map((msg, index) => (
-        <div key={index} ref={index === messages.length - 1 ? lastMessageRef : null}>
-          {msg.sender !== 'system' ? (
-            <p className="dialogue-text text-white leading-relaxed">
-              <span className={`font-bold ${getTextColor(msg.sender)}`}>{getDisplayName(msg.sender)}: </span>
-              {msg.text}
-            </p>
-          ) : (
-            <p className="dialogue-text text-yellow-400 italic text-sm my-1">
-              {msg.text}
-            </p>
-          )}
+    <div ref={scrollRef} className="h-40 sm:h-48 bg-black bg-opacity-70 p-4 rounded-lg border-2 border-purple-400 overflow-y-auto custom-scrollbar">
+      {messages.map((msg) => (
+        <div key={msg.id} className="group flex items-start space-x-2 my-1 pr-4">
+            <div className="flex-grow">
+                {msg.sender !== 'system' ? (
+                    <p className="dialogue-text text-white leading-relaxed">
+                    <span className={`font-bold ${getTextColor(msg.sender)}`}>{getDisplayName(msg.sender)}: </span>
+                    {msg.text}
+                    </p>
+                ) : (
+                    <p className="dialogue-text text-yellow-400 italic text-sm my-1">
+                    {msg.text}
+                    </p>
+                )}
+            </div>
+            {msg.sender !== 'system' && (
+                 <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MessageActions 
+                    message={msg}
+                    onEdit={() => {
+                        const newText = window.prompt("Edit your message:", msg.text);
+                        if (newText && newText.trim() !== msg.text) {
+                            onEditMessage(msg.id, newText.trim());
+                        }
+                    }}
+                    onDelete={() => {
+                        if (window.confirm("Are you sure you want to delete this message? This will roll back the conversation to this point.")) {
+                            onDeleteMessage(msg.id);
+                        }
+                    }}
+                    />
+                </div>
+            )}
         </div>
       ))}
     </div>

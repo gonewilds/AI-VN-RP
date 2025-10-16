@@ -18,6 +18,7 @@ export interface Character {
 }
 
 export interface Message {
+  id: string;
   sender: 'user' | 'ai' | 'system';
   text: string;
   emotion?: string;

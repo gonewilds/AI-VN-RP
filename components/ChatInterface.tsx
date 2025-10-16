@@ -16,6 +16,9 @@ interface ChatInterfaceProps {
   onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
   onGenerateImpersonation: (character: Character, messages: Message[]) => Promise<string[]>;
   isLoading: boolean;
+  onNewChat: () => void;
+  onEditMessage: (messageId: string, newText: string) => void;
+  onDeleteMessage: (messageId: string) => void;
 }
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -37,7 +40,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onBack,
   onSaveTransform,
   onGenerateImpersonation,
-  isLoading
+  isLoading,
+  onNewChat,
+  onEditMessage,
+  onDeleteMessage,
 }) => {
   const [userInput, setUserInput] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -173,7 +179,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">
-        <DialogueBox messages={messages} characterName={character.name} />
+        <DialogueBox 
+          messages={messages} 
+          characterName={character.name}
+          onEditMessage={onEditMessage}
+          onDeleteMessage={onDeleteMessage}
+        />
         
         {suggestedResponses.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2 justify-center">
@@ -237,6 +248,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div 
           className="absolute top-14 right-2 bg-black bg-opacity-80 p-2 rounded-lg shadow-lg border border-purple-500 z-20 space-y-1"
         >
+          <button onClick={() => { onNewChat(); setIsMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
+            New Chat
+          </button>
           <button onClick={handleUploadClick} className="block w-full text-left px-4 py-2 text-white hover:bg-purple-700 rounded transition-colors text-sm">
             Upload Scene
           </button>

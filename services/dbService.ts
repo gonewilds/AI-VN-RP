@@ -1,10 +1,11 @@
-import type { Character } from '../types';
+import type { Character, Message } from '../types';
 
 const DB_NAME = 'VisualNovelDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version for schema change
 const STORES = {
   SETTINGS: 'settings',
   CHARACTERS: 'characters',
+  CHAT_HISTORY: 'chat_history',
 };
 
 let db: IDBDatabase;
@@ -34,6 +35,9 @@ const openDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(STORES.CHARACTERS)) {
         dbInstance.createObjectStore(STORES.CHARACTERS, { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains(STORES.CHAT_HISTORY)) {
+        dbInstance.createObjectStore(STORES.CHAT_HISTORY, { keyPath: 'characterId' });
       }
     };
   });
@@ -99,4 +103,44 @@ export const deleteCharacterDB = async (id: string): Promise<void> => {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
+};
+
+// --- Chat History Functions ---
+
+export const getChatHistory = async (characterId: string): Promise<Message[] | undefined> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CHAT_HISTORY, 'readonly');
+    const store = transaction.objectStore(STORES.CHAT_HISTORY);
+    const request = store.get(characterId);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      resolve(request.result ? request.result.messages : undefined);
+    };
+  });
+};
+
+export const saveChatHistory = async (characterId: string, messages: Message[]): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CHAT_HISTORY, 'readwrite');
+    const store = transaction.objectStore(STORES.CHAT_HISTORY);
+    const request = store.put({ characterId, messages });
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+};
+
+export const deleteChatHistory = async (characterId: string): Promise<void> => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORES.CHAT_HISTORY, 'readwrite');
+        const store = transaction.objectStore(STORES.CHAT_HISTORY);
+        const request = store.delete(characterId);
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+    });
 };
