@@ -23,32 +23,6 @@ export const getAI = (): GoogleGenAI => {
   return aiInstance;
 };
 
-export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' | '3:4' | '4:3' | '9:16' = '1:1'): Promise<string> => {
-  const ai = getAI();
-  try {
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: prompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/png',
-          aspectRatio: aspectRatio,
-        },
-    });
-    
-    const generatedImage = response.generatedImages?.[0];
-    if (generatedImage?.image?.imageBytes) {
-      const base64ImageBytes: string = generatedImage.image.imageBytes;
-      return `data:image/png;base64,${base64ImageBytes}`;
-    }
-
-    throw new Error('No image was generated from response.');
-  } catch (error) {
-    console.error('Error in generateImage:', error);
-    throw error;
-  }
-};
-
 export const getAIResponse = async (chat: Chat, userInput: string): Promise<{ dialogue: string; emotion: string, indicatorValue: number | null }> => {
   try {
     const response: GenerateContentResponse = await chat.sendMessage({ message: userInput });

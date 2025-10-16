@@ -13,4 +13,4 @@ export const DEFAULT_CHARACTER: Omit<Character, 'sprites' | 'emotions'> = {
 
 export const DEFAULT_AI_EMOTIONS: string[] = ['neutral', 'happy', 'sad', 'angry', 'surprised', 'blush', 'thinking', 'wink'];
 
-export const DEFAULT_SCENE_PROMPT = "A peaceful classroom in a Japanese high school during sunset, with warm light streaming through the windows.";
+export const DEFAULT_SCENE_URL = "https://source.unsplash.com/random/1600x900/?anime,scenery,peaceful";

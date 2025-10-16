@@ -10,7 +10,6 @@ interface ChatInterfaceProps {
   sceneImageUrl: string;
   messages: Message[];
   onSendMessage: (message: string) => void;
-  onGenerateScene: (prompt: string) => void;
   onUploadScene: (dataUrl: string) => void;
   onBack: () => void;
   onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
@@ -26,6 +25,7 @@ interface ChatInterfaceProps {
 
 const MIN_CHAT_HEIGHT = 80;
 const MAX_CHAT_HEIGHT = 400;
+const RESIZE_STEP = 40;
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -41,7 +41,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   sceneImageUrl,
   messages,
   onSendMessage,
-  onGenerateScene,
   onUploadScene,
   onBack,
   onSaveTransform,
@@ -61,7 +60,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const resizeRef = useRef<{ isResizing: boolean, startY: number, startHeight: number }>({ isResizing: false, startY: 0, startHeight: 0 });
   const lastMessage = messages[messages.length - 1];
   const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : (character.emotions[0] || 'neutral');
 
@@ -79,32 +77,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return () => document.removeEventListener('fullscreenchange', onFullScreenChange);
   }, []);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!resizeRef.current.isResizing) return;
-    const deltaY = e.clientY - resizeRef.current.startY;
-    const newHeight = resizeRef.current.startHeight - deltaY;
-    const clampedHeight = Math.max(MIN_CHAT_HEIGHT, Math.min(MAX_CHAT_HEIGHT, newHeight));
-    onChatBoxHeightChange(clampedHeight);
-  }, [onChatBoxHeightChange]);
-
-  const handleMouseUp = useCallback(() => {
-    resizeRef.current.isResizing = false;
-    document.body.style.cursor = 'default';
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
-  
-  const handleMouseDownOnResize = (e: React.MouseEvent<HTMLDivElement>) => {
-    resizeRef.current = {
-      isResizing: true,
-      startY: e.clientY,
-      startHeight: chatBoxHeight
-    };
-    document.body.style.cursor = 'ns-resize';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  };
-
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
@@ -118,12 +90,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
   
   const handleSend = () => {
-    if (userInput.startsWith('/scene ')) {
-      const prompt = userInput.substring(7);
-      onGenerateScene(prompt);
-    } else {
-      onSendMessage(userInput);
-    }
+    onSendMessage(userInput);
     setUserInput('');
     setSuggestedResponses([]);
   };
@@ -220,11 +187,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">
-        <div 
-            className="resize-handle"
-            onMouseDown={handleMouseDownOnResize}
-            title="Drag to resize chat history"
-        />
+        <div className="flex items-center justify-center gap-2 mb-1">
+            <button
+                onClick={() => onChatBoxHeightChange(Math.max(MIN_CHAT_HEIGHT, chatBoxHeight - RESIZE_STEP))}
+                title="Decrease chat box height"
+                className="px-3 py-1 bg-black bg-opacity-40 rounded-full text-white hover:bg-opacity-60 text-lg leading-none"
+            >
+                -
+            </button>
+            <span className="text-white text-xs opacity-50 select-none">Chat Size</span>
+            <button
+                onClick={() => onChatBoxHeightChange(Math.min(MAX_CHAT_HEIGHT, chatBoxHeight + RESIZE_STEP))}
+                title="Increase chat box height"
+                className="px-3 py-1 bg-black bg-opacity-40 rounded-full text-white hover:bg-opacity-60 text-lg leading-none"
+            >
+                +
+            </button>
+        </div>
         <DialogueBox 
           messages={messages} 
           characterName={character.name}
@@ -272,7 +251,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSend()}
-            placeholder="Type your message or /scene <description>"
+            placeholder="Type your message..."
             disabled={isLoading}
             className="w-full p-3 bg-black bg-opacity-70 text-white rounded-lg border-2 border-purple-400 focus:border-purple-300 focus:ring-0 outline-none placeholder-gray-400 transition-all"
           />

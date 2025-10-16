@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GoogleGenAI, Chat, Type, Content } from '@google/genai';
 import type { Character, Message } from './types';
-import { DEFAULT_SCENE_PROMPT, DEFAULT_AI_EMOTIONS } from './constants';
+import { DEFAULT_SCENE_URL, DEFAULT_AI_EMOTIONS } from './constants';
 import ChatInterface from './components/ChatInterface';
 import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
 import CharacterListPage from './components/CharacterListPage';
 import SettingsModal from './components/SettingsModal';
 import ChatSettingsModal from './components/ChatSettingsModal';
-import { generateImage, getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
+import { getAIResponse, generateGreeting, initializeAI, isAIInitialized, getAI, generateImpersonatedResponses } from './services/geminiService';
 import { getAllCharacters, saveCharacter, deleteCharacterDB, getSetting, setSetting, getChatHistory, saveChatHistory, deleteChatHistory } from './services/dbService';
 
 const convertMessagesToHistory = (messages: Message[]): Content[] => {
@@ -39,22 +39,6 @@ const App: React.FC = () => {
 
   const chatRef = useRef<Chat | null>(null);
   const appContainerRef = useRef<HTMLDivElement>(null);
-
-  const generateCharacterAssets = useCallback(async (charData: Omit<Character, 'sprites' | 'id' | 'emotions' | 'indicator'>): Promise<{ sprites: Record<string, string>, emotions: string[] }> => {
-    setLoadingMessage(`Creating character: ${charData.name}...`);
-    
-    const spriteUrls: Record<string, string> = {};
-
-    for (const emotion of DEFAULT_AI_EMOTIONS) {
-      setLoadingMessage(`Generating ${emotion} expression...`);
-      const prompt = `anime character sprite, full body portrait of ${charData.name}, ${charData.visualDescription}, expressing a ${emotion} emotion. The character should be on a simple, non-distracting background. digital art, high quality, vibrant colors, clean line art.`;
-      const url = await generateImage(prompt, '3:4');
-      spriteUrls[emotion] = url;
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
-    return { sprites: spriteUrls, emotions: DEFAULT_AI_EMOTIONS };
-  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -250,48 +234,16 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   };
-  
-  const handleGenerateScene = async (prompt: string) => {
-    if (!prompt.trim() || isLoading) return;
-    const systemMessage: Message = { id: `${Date.now()}-system`, sender: 'system', text: `Generating new scene: ${prompt}` };
-    const newMessages = [...messages, systemMessage];
-    setMessages(newMessages);
-    await saveChatHistory(currentCharacter!.id, newMessages);
 
-    setIsLoading(true);
-    setLoadingMessage('Generating new scene...');
-    try {
-      const url = await generateImage(`beautiful anime background scenery, ${prompt}, vibrant colors, detailed environment, digital painting.`, '16:9');
-      setSceneImageUrl(url);
-    } catch (error) {
-      console.error("Error generating scene:", error);
-      const errorMessage: Message = { id: `${Date.now()}-system`, sender: 'system', text: 'Failed to generate the scene.' };
-      const finalMessages = [...newMessages, errorMessage];
-      setMessages(finalMessages);
-      await saveChatHistory(currentCharacter!.id, finalMessages);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveCharacter = async (data: Omit<Character, 'id' | 'sprites'>, sprites?: Record<string, string>) => {
+  const handleSaveCharacter = async (data: Omit<Character, 'id' | 'sprites'>, sprites: Record<string, string>) => {
     setShowCreator(false);
     setEditingCharacter(null);
     setIsLoading(true);
+    setLoadingMessage('Saving character...');
 
     try {
-      let finalCharacter: Character;
-      if (sprites) { // Uploaded or edited sprites
-        finalCharacter = { ...data, id: editingCharacter?.id || Date.now().toString(), sprites };
-      } else { // AI generation needed
-        if (!isAIInitialized()) {
-            alert('API Key is not set. Please set it in the settings.');
-            setIsLoading(false);
-            return;
-        }
-        const { sprites: generatedSprites, emotions: generatedEmotions } = await generateCharacterAssets(data);
-        finalCharacter = { ...data, id: editingCharacter?.id || Date.now().toString(), sprites: generatedSprites, emotions: generatedEmotions };
-      }
+      // AI generation path is removed. Sprites are always provided by the user.
+      const finalCharacter: Character = { ...data, id: editingCharacter?.id || Date.now().toString(), sprites };
 
       await saveCharacter(finalCharacter);
       
@@ -320,9 +272,8 @@ const App: React.FC = () => {
       if (character.sceneImageUrl) {
         setSceneImageUrl(character.sceneImageUrl);
       } else {
-        setLoadingMessage('Generating scene...');
-        const sceneUrl = await generateImage(DEFAULT_SCENE_PROMPT, '16:9');
-        setSceneImageUrl(sceneUrl);
+        // Use default static scene URL instead of generating one.
+        setSceneImageUrl(DEFAULT_SCENE_URL);
       }
 
       if (history) {
@@ -596,7 +547,6 @@ const App: React.FC = () => {
             sceneImageUrl={sceneImageUrl}
             messages={messages}
             onSendMessage={handleSendMessage}
-            onGenerateScene={handleGenerateScene}
             onUploadScene={handleSetSceneFromUpload}
             onBack={() => window.history.back()}
             onSaveTransform={handleSaveTransform}

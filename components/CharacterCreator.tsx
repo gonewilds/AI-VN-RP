@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import type { Character } from '../types';
 
 interface CharacterCreatorProps {
-  onSave: (data: Omit<Character, 'id' | 'sprites'>, sprites?: Record<string, string>) => void;
+  onSave: (data: Omit<Character, 'id' | 'sprites'>, sprites: Record<string, string>) => void;
   onClose: () => void;
   characterToEdit: Character | null;
 }
@@ -18,22 +18,14 @@ const fileToDataUrl = (file: File): Promise<string> => {
 
 const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, characterToEdit }) => {
   const isEditMode = !!characterToEdit;
-  const [mode, setMode] = useState<'ai' | 'upload'>(isEditMode ? 'upload' : 'ai');
 
-  // Shared state
   const [name, setName] = useState('');
   const [personality, setPersonality] = useState('');
+  const [visualDescription, setVisualDescription] = useState('');
   const [sceneImageUrl, setSceneImageUrl] = useState<string | undefined>(undefined);
   const [systemInstruction, setSystemInstruction] = useState('');
-  
-  // State for AI creation
-  const [aiVisualDescription, setAiVisualDescription] = useState('');
-
-  // State for Upload/Edit creation
   const [emotions, setEmotions] = useState<string[]>(['neutral', 'happy', 'sad']);
   const [sprites, setSprites] = useState<Record<string, string | null>>({});
-
-  // State for Indicator
   const [indicatorName, setIndicatorName] = useState('Affection');
   const [indicatorValue, setIndicatorValue] = useState(50);
 
@@ -41,7 +33,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
     if (isEditMode && characterToEdit) {
       setName(characterToEdit.name);
       setPersonality(characterToEdit.personality);
-      setAiVisualDescription(characterToEdit.visualDescription);
+      setVisualDescription(characterToEdit.visualDescription);
       setEmotions(characterToEdit.emotions);
       setSprites(characterToEdit.sprites);
       setSceneImageUrl(characterToEdit.sceneImageUrl);
@@ -54,25 +46,20 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const commonData: Omit<Character, 'id' | 'sprites' | 'emotions'> = {
-        name,
-        personality,
-        visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
-        sceneImageUrl,
-        transform: characterToEdit?.transform, // Preserve existing transform
-        indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue },
-        systemInstruction: systemInstruction.trim() ? systemInstruction.trim() : undefined,
-    };
+    
+    if (isFormValid) {
+        const commonData: Omit<Character, 'id' | 'sprites' | 'emotions'> = {
+            name,
+            personality,
+            visualDescription,
+            sceneImageUrl,
+            transform: characterToEdit?.transform, // Preserve existing transform
+            indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue },
+            systemInstruction: systemInstruction.trim() ? systemInstruction.trim() : undefined,
+        };
 
-    if (mode === 'ai') {
-        if (isAiFormValid) {
-            onSave(commonData);
-        }
-    } else { // upload mode
-        if (isUploadFormValid) {
-            const finalSprites = Object.fromEntries(Object.entries(sprites).filter(([, val]) => val !== null)) as Record<string, string>;
-            onSave({ ...commonData, emotions }, finalSprites);
-        }
+        const finalSprites = Object.fromEntries(Object.entries(sprites).filter(([, val]) => val !== null)) as Record<string, string>;
+        onSave({ ...commonData, emotions }, finalSprites);
     }
   };
 
@@ -96,11 +83,7 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
     }
   };
   
-  const isAiFormValid = useMemo(() => {
-    return name.trim() !== '' && personality.trim() !== '' && aiVisualDescription.trim() !== '';
-  }, [name, personality, aiVisualDescription]);
-
-  const isUploadFormValid = useMemo(() => {
+  const isFormValid = useMemo(() => {
     return name.trim() !== '' && personality.trim() !== '' && emotions.every(e => !!sprites[e]);
   }, [name, personality, sprites, emotions]);
 
@@ -138,19 +121,6 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
             return newSprites;
         });
     };
-  
-  const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode, disabled?: boolean }> = ({ active, onClick, children, disabled }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${
-        active ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      {children}
-    </button>
-  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
@@ -161,17 +131,9 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
           </svg>
         </button>
         
-        <div className="flex-shrink-0 border-b-2 border-purple-500 px-6 pt-4">
-            <div className="flex space-x-2">
-                <TabButton active={mode === 'ai'} onClick={() => setMode('ai')} disabled={isEditMode}>Create with AI</TabButton>
-                <TabButton active={mode === 'upload'} onClick={() => setMode('upload')}>{isEditMode ? 'Edit Character' : 'Upload Manually'}</TabButton>
-            </div>
-        </div>
-
         <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-6">
-          <h2 className="text-2xl font-bold text-pink-400">{isEditMode ? 'Edit Character' : 'Create Character'}</h2>
+          <h2 className="text-2xl font-bold text-pink-400 border-b-2 border-purple-500 pb-2">{isEditMode ? 'Edit Character' : 'Create Character'}</h2>
           
-          {/* Common Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="char-name" className="block text-sm font-medium text-gray-300">Name</label>
@@ -183,45 +145,41 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
               </div>
           </div>
           
-          {mode === 'ai' && (
-             <div>
-              <label htmlFor="ai-visualDescription" className="block text-sm font-medium text-gray-300">Visual Description (for AI Generation)</label>
-              <textarea id="ai-visualDescription" value={aiVisualDescription} onChange={(e) => setAiVisualDescription(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="e.g., Long silver hair, wears glasses..." required />
-            </div>
-          )}
+           <div>
+            <label htmlFor="visual-description" className="block text-sm font-medium text-gray-300">Visual Description (Optional)</label>
+            <textarea id="visual-description" value={visualDescription} onChange={(e) => setVisualDescription(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="Notes about the character's appearance..." />
+          </div>
 
-          {mode === 'upload' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Character Sprites & Emotions</h3>
-                {emotions.map((emotion, index) => (
-                  <div key={index} className="flex items-center gap-4 p-2 bg-gray-700 rounded-md">
-                    <div className="w-24 h-32 bg-gray-600 rounded-md flex-shrink-0">
-                       {sprites[emotion] && <img src={sprites[emotion]} alt={`${emotion} preview`} className="w-full h-full object-contain rounded-md" />}
-                    </div>
-                    <div className="flex-grow space-y-2">
-                        <input
-                            type="text"
-                            value={emotion}
-                            onChange={(e) => handleEmotionNameChange(index, e.target.value)}
-                            placeholder="Emotion Name (e.g., happy)"
-                            className="block w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-sm"
-                        />
-                         <input
-                            type="file"
-                            accept="image/png, image/jpeg"
-                            onChange={(e) => handleFileChange(emotion, e.target.files ? e.target.files[0] : null)}
-                            className="block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
-                        />
-                    </div>
-                    <button type="button" onClick={() => removeEmotion(index)} className="text-red-400 hover:text-red-300 p-2" title="Remove Emotion">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
-                    </button>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Character Sprites & Emotions</h3>
+              {emotions.map((emotion, index) => (
+                <div key={index} className="flex items-center gap-4 p-2 bg-gray-700 rounded-md">
+                  <div className="w-24 h-32 bg-gray-600 rounded-md flex-shrink-0">
+                      {sprites[emotion] && <img src={sprites[emotion]} alt={`${emotion} preview`} className="w-full h-full object-contain rounded-md" />}
                   </div>
-                ))}
-                <button type="button" onClick={addEmotion} className="w-full mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors text-sm">Add Emotion</button>
-            </div>
-          )}
-
+                  <div className="flex-grow space-y-2">
+                      <input
+                          type="text"
+                          value={emotion}
+                          onChange={(e) => handleEmotionNameChange(index, e.target.value)}
+                          placeholder="Emotion Name (e.g., happy)"
+                          className="block w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-sm"
+                      />
+                        <input
+                          type="file"
+                          accept="image/png, image/jpeg"
+                          onChange={(e) => handleFileChange(emotion, e.target.files ? e.target.files[0] : null)}
+                          className="block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+                      />
+                  </div>
+                  <button type="button" onClick={() => removeEmotion(index)} className="text-red-400 hover:text-red-300 p-2" title="Remove Emotion">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addEmotion} className="w-full mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors text-sm">Add Emotion</button>
+          </div>
+         
           <div>
               <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Relationship Indicator</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -282,8 +240,8 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
           </details>
 
           <div className="flex justify-end pt-4">
-            <button type="submit" className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={mode === 'ai' ? !isAiFormValid : !isUploadFormValid}>
-              {isEditMode ? 'Save Changes' : (mode === 'ai' ? 'Generate Character' : 'Create Character')}
+            <button type="submit" className="px-6 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={!isFormValid}>
+              {isEditMode ? 'Save Changes' : 'Create Character'}
             </button>
           </div>
         </form>
