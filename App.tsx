@@ -200,12 +200,18 @@ const App: React.FC = () => {
   const handleSendMessage = async (userInput: string, isRegeneration = false) => {
     if (!userInput.trim() || !chatRef.current || isLoading || !currentCharacter) return;
 
-    let messagesForAI = [...messages];
-    if (!isRegeneration) {
-        const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
-        messagesForAI = [...messages, userMessage];
-        setMessages(messagesForAI);
-        await saveChatHistory(currentCharacter.id, messagesForAI);
+    let messagesForAI: Message[];
+    
+    // When regenerating, the base is the current message list minus the last AI response.
+    if (isRegeneration) {
+      messagesForAI = messages.slice(0, -1);
+    } else {
+      // For a new message, add the user's input.
+      const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
+      messagesForAI = [...messages, userMessage];
+      // Update UI immediately with user's message.
+      setMessages(messagesForAI);
+      await saveChatHistory(currentCharacter.id, messagesForAI);
     }
     
     setIsLoading(true);
