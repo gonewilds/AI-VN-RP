@@ -6,6 +6,7 @@ interface DialogueBoxProps {
   characterName: string;
   onEditMessage: (messageId: string, newText: string) => void;
   onDeleteMessage: (messageId: string) => void;
+  height: number;
 }
 
 const MessageActions: React.FC<{ message: Message; onEdit: () => void; onDelete: () => void; }> = ({ message, onEdit, onDelete }) => {
@@ -41,15 +42,25 @@ const MessageActions: React.FC<{ message: Message; onEdit: () => void; onDelete:
   );
 };
 
+const parseMessageText = (text: string): React.ReactNode => {
+  const parts = text.split(/(\*.*?\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={index} className="action-text">{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+};
 
-const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEditMessage, onDeleteMessage }) => {
+
+const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEditMessage, onDeleteMessage, height }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, height]);
 
   const getDisplayName = (sender: 'ai' | 'user' | 'system') => {
     if (sender === 'ai') return characterName;
@@ -64,14 +75,18 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEd
   }
 
   return (
-    <div ref={scrollRef} className="h-40 sm:h-48 bg-black bg-opacity-70 p-4 rounded-lg border-2 border-purple-400 overflow-y-auto custom-scrollbar">
+    <div 
+      ref={scrollRef} 
+      className="bg-black bg-opacity-70 p-4 rounded-lg border-2 border-purple-400 overflow-y-auto custom-scrollbar"
+      style={{ height: `${height}px` }}
+    >
       {messages.map((msg) => (
         <div key={msg.id} className="group flex items-start space-x-2 my-1 pr-4">
             <div className="flex-grow">
                 {msg.sender !== 'system' ? (
                     <p className="dialogue-text text-white leading-relaxed">
                     <span className={`font-bold ${getTextColor(msg.sender)}`}>{getDisplayName(msg.sender)}: </span>
-                    {msg.text}
+                    {parseMessageText(msg.text)}
                     </p>
                 ) : (
                     <p className="dialogue-text text-yellow-400 italic text-sm my-1">

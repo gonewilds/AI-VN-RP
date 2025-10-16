@@ -35,6 +35,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showChatSettings, setShowChatSettings] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<'characterList' | 'chat'>('characterList');
+  const [chatBoxHeight, setChatBoxHeight] = useState<number>(160); // Default height in pixels
 
   const chatRef = useRef<Chat | null>(null);
   const appContainerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,9 @@ const App: React.FC = () => {
           
           const storedUserPersonality = await getSetting<string>('userPersonality') || '';
           setUserPersonality(storedUserPersonality);
+
+          const storedChatBoxHeight = await getSetting<number>('chatBoxHeight') || 160;
+          setChatBoxHeight(storedChatBoxHeight);
           
           setLoadingMessage('Loading characters...');
           const storedCharacters = await getAllCharacters();
@@ -145,9 +149,10 @@ const App: React.FC = () => {
     You are talking to a user named {{user.name}} whose personality is: {{user.personality}}. You must always stay in character.
     You have an indicator called "{{character.indicator.name}}" which is currently at {{character.indicator.value}} (out of 100). Your interactions should influence this value. A positive interaction may increase it, a negative one may decrease it. The value must stay between 0 and 100.
     When you respond, you must determine your current emotion based on the conversation.
+    Actions or expressions should be described between asterisks, like *smiles*.
     Your response must be in a valid JSON format with three keys: "dialogue" for what you say, "emotion" for how you feel, and "indicatorValue" for the new value of "{{character.indicator.name}}".
     The possible emotions are only: {{character.emotions}}.
-    Example: {"dialogue": "Hello there, {{user.name}}!", "emotion": "happy", "indicatorValue": 51}`;
+    Example: {"dialogue": "Hello there, *waves happily* it's great to see you, {{user.name}}!", "emotion": "happy", "indicatorValue": 51}`;
   };
 
   const initializeChat = useCallback((char: Character, history: Message[]) => {
@@ -184,6 +189,7 @@ const App: React.FC = () => {
             emotion: { type: Type.STRING },
             indicatorValue: { type: Type.NUMBER },
           },
+          required: ['dialogue', 'emotion', 'indicatorValue']
         },
       },
     });
@@ -543,6 +549,10 @@ const App: React.FC = () => {
     alert("Message edited. The conversation has been rolled back to this point.");
   };
 
+  const handleChatBoxHeightChange = async (newHeight: number) => {
+    setChatBoxHeight(newHeight);
+    await setSetting('chatBoxHeight', newHeight);
+  };
 
   return (
     <div ref={appContainerRef} className="w-screen bg-black flex justify-center items-center overflow-hidden">
@@ -596,6 +606,8 @@ const App: React.FC = () => {
             onDeleteMessage={handleDeleteMessage}
             isLoading={isLoading}
             onShowChatSettings={() => setShowChatSettings(true)}
+            chatBoxHeight={chatBoxHeight}
+            onChatBoxHeightChange={handleChatBoxHeightChange}
           />
         )}
       </div>

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -15,6 +14,11 @@
       }
       .dialogue-text {
         text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
+      }
+      .action-text {
+        font-style: italic;
+        color: #a7f3d0; /* A pleasant, readable light green */
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
       }
       .character-sprite {
         -webkit-filter: drop-shadow(5px 5px 5px #222);
@@ -34,6 +38,22 @@
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: rgba(255,255,255,0.6);
+      }
+      .resize-handle {
+        cursor: ns-resize;
+        width: 100%;
+        height: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .resize-handle::before {
+        content: '';
+        display: block;
+        width: 40px;
+        height: 4px;
+        background-color: rgba(255, 255, 255, 0.4);
+        border-radius: 2px;
       }
     </style>
   <script type="importmap">

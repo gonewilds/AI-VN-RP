@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Character, Message } from '../types';
 import DialogueBox from './DialogueBox';
 import CharacterSprite from './CharacterSprite';
@@ -20,7 +20,12 @@ interface ChatInterfaceProps {
   onEditMessage: (messageId: string, newText: string) => void;
   onDeleteMessage: (messageId: string) => void;
   onShowChatSettings: () => void;
+  chatBoxHeight: number;
+  onChatBoxHeightChange: (newHeight: number) => void;
 }
+
+const MIN_CHAT_HEIGHT = 80;
+const MAX_CHAT_HEIGHT = 400;
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -46,6 +51,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onEditMessage,
   onDeleteMessage,
   onShowChatSettings,
+  chatBoxHeight,
+  onChatBoxHeightChange
 }) => {
   const [userInput, setUserInput] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -54,6 +61,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [suggestedResponses, setSuggestedResponses] = useState<string[]>([]);
   const [isImpersonating, setIsImpersonating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resizeRef = useRef<{ isResizing: boolean, startY: number, startHeight: number }>({ isResizing: false, startY: 0, startHeight: 0 });
   const lastMessage = messages[messages.length - 1];
   const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : (character.emotions[0] || 'neutral');
 
@@ -70,6 +78,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     document.addEventListener('fullscreenchange', onFullScreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullScreenChange);
   }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!resizeRef.current.isResizing) return;
+    const deltaY = e.clientY - resizeRef.current.startY;
+    const newHeight = resizeRef.current.startHeight - deltaY;
+    const clampedHeight = Math.max(MIN_CHAT_HEIGHT, Math.min(MAX_CHAT_HEIGHT, newHeight));
+    onChatBoxHeightChange(clampedHeight);
+  }, [onChatBoxHeightChange]);
+
+  const handleMouseUp = useCallback(() => {
+    resizeRef.current.isResizing = false;
+    document.body.style.cursor = 'default';
+    window.removeEventListener('mousemove', handleMouseMove);
+    window.removeEventListener('mouseup', handleMouseUp);
+  }, [handleMouseMove]);
+  
+  const handleMouseDownOnResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    resizeRef.current = {
+      isResizing: true,
+      startY: e.clientY,
+      startHeight: chatBoxHeight
+    };
+    document.body.style.cursor = 'ns-resize';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -137,6 +171,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsMenuOpen(false);
   };
 
+  const chatUIHeight = chatBoxHeight + 80; // dialogue box + input area + padding
+
   return (
     <div className="relative w-full h-full overflow-hidden flex flex-col bg-gray-800">
       <div
@@ -175,17 +211,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
            </svg>
          </button>
       </div>
-
-      <div className="flex-grow flex justify-center items-end pb-40 overflow-hidden">
+      
+      <div 
+        className="flex-grow flex justify-center items-end overflow-hidden transition-all duration-100"
+        style={{ paddingBottom: `${chatUIHeight}px` }}
+      >
         <CharacterSprite character={character} emotion={currentEmotion} transform={spriteTransform} />
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">
+        <div 
+            className="resize-handle"
+            onMouseDown={handleMouseDownOnResize}
+            title="Drag to resize chat history"
+        />
         <DialogueBox 
           messages={messages} 
           characterName={character.name}
           onEditMessage={onEditMessage}
           onDeleteMessage={onDeleteMessage}
+          height={chatBoxHeight}
         />
         
         {suggestedResponses.length > 0 && (
