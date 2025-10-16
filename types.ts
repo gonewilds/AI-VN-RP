@@ -1,11 +1,10 @@
-export type Emotion = 'neutral' | 'happy' | 'sad' | 'angry' | 'surprised' | 'blush' | 'thinking' | 'wink';
-
 export interface Character {
   id: string;
   name: string;
   personality: string;
   visualDescription: string;
-  sprites: Record<Emotion, string>;
+  emotions: string[];
+  sprites: Record<string, string>;
   sceneImageUrl?: string; // Character-specific background scene
   systemInstruction?: string; // Custom system instruction for the AI
   transform?: {
@@ -13,10 +12,14 @@ export interface Character {
     y: number;
     scale: number;
   };
+  indicator: {
+    name: string;
+    value: number;
+  };
 }
 
 export interface Message {
   sender: 'user' | 'ai' | 'system';
   text: string;
-  emotion?: Emotion;
+  emotion?: string;
 }

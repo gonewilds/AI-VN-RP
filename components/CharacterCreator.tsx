@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ALL_EMOTIONS } from '../constants';
-import type { Character, Emotion } from '../types';
+import type { Character } from '../types';
 
 interface CharacterCreatorProps {
-  onSave: (data: Omit<Character, 'id' | 'sprites'>, sprites?: Record<Emotion, string>) => void;
+  onSave: (data: Omit<Character, 'id' | 'sprites'>, sprites?: Record<string, string>) => void;
   onClose: () => void;
   characterToEdit: Character | null;
 }
@@ -31,29 +30,38 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   const [aiVisualDescription, setAiVisualDescription] = useState('');
 
   // State for Upload/Edit creation
-  const [sprites, setSprites] = useState<Record<Emotion, string | null>>(Object.fromEntries(ALL_EMOTIONS.map(e => [e, null])) as Record<Emotion, null>);
+  const [emotions, setEmotions] = useState<string[]>(['neutral', 'happy', 'sad']);
+  const [sprites, setSprites] = useState<Record<string, string | null>>({});
+
+  // State for Indicator
+  const [indicatorName, setIndicatorName] = useState('Affection');
+  const [indicatorValue, setIndicatorValue] = useState(50);
 
   useEffect(() => {
     if (isEditMode && characterToEdit) {
       setName(characterToEdit.name);
       setPersonality(characterToEdit.personality);
       setAiVisualDescription(characterToEdit.visualDescription);
+      setEmotions(characterToEdit.emotions);
       setSprites(characterToEdit.sprites);
       setSceneImageUrl(characterToEdit.sceneImageUrl);
       setSystemInstruction(characterToEdit.systemInstruction);
+      setIndicatorName(characterToEdit.indicator.name);
+      setIndicatorValue(characterToEdit.indicator.value);
     }
   }, [isEditMode, characterToEdit]);
 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const commonData: Omit<Character, 'id' | 'sprites'> = {
+    const commonData: Omit<Character, 'id' | 'sprites' | 'emotions'> = {
         name,
         personality,
         visualDescription: mode === 'ai' ? aiVisualDescription : (characterToEdit?.visualDescription || 'User-provided images.'),
         sceneImageUrl,
         systemInstruction,
         transform: characterToEdit?.transform, // Preserve existing transform
+        indicator: { name: indicatorName.trim() || 'Affection', value: indicatorValue }
     };
 
     if (mode === 'ai') {
@@ -62,12 +70,13 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
         }
     } else { // upload mode
         if (isUploadFormValid) {
-            onSave(commonData, sprites as Record<Emotion, string>);
+            const finalSprites = Object.fromEntries(Object.entries(sprites).filter(([, val]) => val !== null)) as Record<string, string>;
+            onSave({ ...commonData, emotions }, finalSprites);
         }
     }
   };
 
-  const handleFileChange = async (type: Emotion | 'scene', file: File | null) => {
+  const handleFileChange = async (type: string | 'scene', file: File | null) => {
     if (file) {
       if (file.size > 4 * 1024 * 1024) { // 4MB limit
         alert(`File for ${type} is too large. Please upload an image under 4MB.`);
@@ -92,8 +101,43 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
   }, [name, personality, aiVisualDescription]);
 
   const isUploadFormValid = useMemo(() => {
-    return name.trim() !== '' && personality.trim() !== '' && Object.values(sprites).every(s => s !== null);
-  }, [name, personality, sprites]);
+    return name.trim() !== '' && personality.trim() !== '' && emotions.every(e => !!sprites[e]);
+  }, [name, personality, sprites, emotions]);
+
+    const handleEmotionNameChange = (index: number, newName: string) => {
+        const oldName = emotions[index];
+        const updatedEmotions = [...emotions];
+        updatedEmotions[index] = newName;
+        setEmotions(updatedEmotions);
+        
+        if (sprites[oldName]) {
+            setSprites(prev => {
+                const newSprites = {...prev};
+                newSprites[newName] = newSprites[oldName];
+                delete newSprites[oldName];
+                return newSprites;
+            });
+        }
+    };
+    
+    const addEmotion = () => {
+        const newEmotionName = `Emotion ${emotions.length + 1}`;
+        setEmotions(prev => [...prev, newEmotionName]);
+    };
+
+    const removeEmotion = (indexToRemove: number) => {
+        if (emotions.length <= 1) {
+            alert("A character must have at least one emotion.");
+            return;
+        }
+        const nameToRemove = emotions[indexToRemove];
+        setEmotions(prev => prev.filter((_, i) => i !== indexToRemove));
+        setSprites(prev => {
+            const newSprites = {...prev};
+            delete newSprites[nameToRemove];
+            return newSprites;
+        });
+    };
   
   const TabButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode, disabled?: boolean }> = ({ active, onClick, children, disabled }) => (
     <button
@@ -120,11 +164,11 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
         <div className="flex-shrink-0 border-b-2 border-purple-500 px-6 pt-4">
             <div className="flex space-x-2">
                 <TabButton active={mode === 'ai'} onClick={() => setMode('ai')} disabled={isEditMode}>Create with AI</TabButton>
-                <TabButton active={mode === 'upload'} onClick={() => setMode('upload')}>{isEditMode ? 'Edit Sprites & Scene' : 'Upload Sprites & Scene'}</TabButton>
+                <TabButton active={mode === 'upload'} onClick={() => setMode('upload')}>{isEditMode ? 'Edit Character' : 'Upload Manually'}</TabButton>
             </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-6">
           <h2 className="text-2xl font-bold text-pink-400">{isEditMode ? 'Edit Character' : 'Create Character'}</h2>
           
           {/* Common Fields */}
@@ -140,56 +184,81 @@ const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onSave, onClose, ch
           </div>
           
           {mode === 'ai' && (
-             <div className="space-y-4">
-              <div>
-                <label htmlFor="ai-visualDescription" className="block text-sm font-medium text-gray-300">Visual Description (for AI Generation)</label>
-                <textarea id="ai-visualDescription" value={aiVisualDescription} onChange={(e) => setAiVisualDescription(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="e.g., Long silver hair, wears glasses..." required />
-              </div>
+             <div>
+              <label htmlFor="ai-visualDescription" className="block text-sm font-medium text-gray-300">Visual Description (for AI Generation)</label>
+              <textarea id="ai-visualDescription" value={aiVisualDescription} onChange={(e) => setAiVisualDescription(e.target.value)} rows={2} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md p-2" placeholder="e.g., Long silver hair, wears glasses..." required />
             </div>
           )}
 
           {mode === 'upload' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Character Sprites</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {ALL_EMOTIONS.map(emotion => (
-                  <div key={emotion}>
-                    <label className="block text-sm font-medium text-gray-300 capitalize mb-1 text-center">{emotion}</label>
-                    <div className="aspect-w-3 aspect-h-4 bg-gray-700 rounded-md flex items-center justify-center">
-                      {sprites[emotion] ? (
-                        <img src={sprites[emotion]} alt={`${emotion} preview`} className="w-full h-full object-contain rounded-md" />
-                      ) : (
-                        <span className="text-gray-400 text-xs text-center">Upload Image</span>
-                      )}
+              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Character Sprites & Emotions</h3>
+                {emotions.map((emotion, index) => (
+                  <div key={index} className="flex items-center gap-4 p-2 bg-gray-700 rounded-md">
+                    <div className="w-24 h-32 bg-gray-600 rounded-md flex-shrink-0">
+                       {sprites[emotion] && <img src={sprites[emotion]} alt={`${emotion} preview`} className="w-full h-full object-contain rounded-md" />}
                     </div>
-                     <input
-                        type="file"
-                        accept="image/png, image/jpeg"
-                        onChange={(e) => handleFileChange(emotion, e.target.files ? e.target.files[0] : null)}
-                        className="mt-2 block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
-                      />
+                    <div className="flex-grow space-y-2">
+                        <input
+                            type="text"
+                            value={emotion}
+                            onChange={(e) => handleEmotionNameChange(index, e.target.value)}
+                            placeholder="Emotion Name (e.g., happy)"
+                            className="block w-full bg-gray-800 border border-gray-600 rounded-md p-2 text-sm"
+                        />
+                         <input
+                            type="file"
+                            accept="image/png, image/jpeg"
+                            onChange={(e) => handleFileChange(emotion, e.target.files ? e.target.files[0] : null)}
+                            className="block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+                        />
+                    </div>
+                    <button type="button" onClick={() => removeEmotion(index)} className="text-red-400 hover:text-red-300 p-2" title="Remove Emotion">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                    </button>
                   </div>
                 ))}
-              </div>
+                <button type="button" onClick={addEmotion} className="w-full mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors text-sm">Add Emotion</button>
             </div>
           )}
+
+          <div>
+              <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Relationship Indicator</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                  <input 
+                    type="text"
+                    value={indicatorName}
+                    onChange={(e) => setIndicatorName(e.target.value)}
+                    className="block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-sm"
+                    placeholder="Indicator Name (e.g. Affection)"
+                  />
+                  <div className="flex items-center gap-2">
+                      <input 
+                        type="range" min="0" max="100"
+                        value={indicatorValue}
+                        onChange={(e) => setIndicatorValue(Number(e.target.value))}
+                        className="w-full"
+                      />
+                      <span className="font-mono bg-gray-900 px-2 py-1 rounded-md">{indicatorValue}</span>
+                  </div>
+              </div>
+          </div>
 
           <div>
               <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Custom System Instructions (Advanced)</h3>
               <textarea 
                 value={systemInstruction || ''}
                 onChange={(e) => setSystemInstruction(e.target.value)}
-                rows={4}
+                rows={3}
                 className="mt-2 block w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-sm"
-                placeholder="Leave blank to use default instructions based on personality. Or, provide your own detailed instructions for the AI character."
+                placeholder="Leave blank to use default instructions. Or, provide your own detailed instructions for the AI character."
               />
           </div>
           
-          {/* Scene Uploader */}
            <div>
               <h3 className="text-lg font-semibold text-purple-300 border-b border-gray-600 pb-2">Character's Scene (Optional)</h3>
               <div className="mt-2 flex items-center gap-4">
-                  <div className="w-48 h-28 bg-gray-700 rounded-md flex items-center justify-center">
+                  <div className="w-48 h-28 bg-gray-700 rounded-md flex items-center justify-center flex-shrink-0">
                       {sceneImageUrl ? (
                           <img src={sceneImageUrl} alt="Scene preview" className="w-full h-full object-cover rounded-md" />
                       ) : (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GoogleGenAI, Chat, Type } from '@google/genai';
 import type { Character, Message } from './types';
-import { DEFAULT_SCENE_PROMPT, ALL_EMOTIONS } from './constants';
+import { DEFAULT_SCENE_PROMPT, DEFAULT_AI_EMOTIONS } from './constants';
 import ChatInterface from './components/ChatInterface';
 import CharacterCreator from './components/CharacterCreator';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -30,12 +30,12 @@ const App: React.FC = () => {
   const chatRef = useRef<Chat | null>(null);
   const appContainerRef = useRef<HTMLDivElement>(null);
 
-  const generateCharacterAssets = useCallback(async (charData: Omit<Character, 'sprites' | 'id'>): Promise<Omit<Character, 'id'>> => {
+  const generateCharacterAssets = useCallback(async (charData: Omit<Character, 'sprites' | 'id' | 'emotions' | 'indicator'>): Promise<{ sprites: Record<string, string>, emotions: string[] }> => {
     setLoadingMessage(`Creating character: ${charData.name}...`);
     
-    const spriteUrls: Partial<Record<typeof ALL_EMOTIONS[number], string>> = {};
+    const spriteUrls: Record<string, string> = {};
 
-    for (const emotion of ALL_EMOTIONS) {
+    for (const emotion of DEFAULT_AI_EMOTIONS) {
       setLoadingMessage(`Generating ${emotion} expression...`);
       const prompt = `anime character sprite, full body portrait of ${charData.name}, ${charData.visualDescription}, expressing a ${emotion} emotion. The character should be on a simple, non-distracting background. digital art, high quality, vibrant colors, clean line art.`;
       const url = await generateImage(prompt, '3:4');
@@ -43,7 +43,7 @@ const App: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
-    return { ...charData, sprites: spriteUrls as Record<typeof ALL_EMOTIONS[number], string> };
+    return { sprites: spriteUrls, emotions: DEFAULT_AI_EMOTIONS };
   }, []);
 
   useEffect(() => {
@@ -101,9 +101,12 @@ const App: React.FC = () => {
   
   const getDefaultSystemInstruction = (char: Character, currentUserName: string, currentUserPersonality: string): string => {
     return `You are an AI character in a visual novel. Your name is ${char.name}. Your personality is described as: ${char.personality}. 
-    You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character. When you respond, you must determine your current emotion based on the conversation.
-    Your response must be in a valid JSON format with two keys: "dialogue" for what you say, and "emotion" for how you feel. 
-    The possible emotions are only: ${ALL_EMOTIONS.join(', ')}. Example: {"dialogue": "Hello there, ${currentUserName}!", "emotion": "happy"}`;
+    You are talking to a user named ${currentUserName} whose personality is: ${currentUserPersonality || 'not specified'}. You must always stay in character.
+    You have an indicator called "${char.indicator.name}" which is currently at ${char.indicator.value} (out of 100). Your interactions should influence this value. A positive interaction may increase it, a negative one may decrease it. The value must stay between 0 and 100.
+    When you respond, you must determine your current emotion based on the conversation.
+    Your response must be in a valid JSON format with three keys: "dialogue" for what you say, "emotion" for how you feel, and "indicatorValue" for the new value of "${char.indicator.name}".
+    The possible emotions are only: ${char.emotions.join(', ')}.
+    Example: {"dialogue": "Hello there, ${currentUserName}!", "emotion": "happy", "indicatorValue": ${Math.min(100, char.indicator.value + 1)}}`;
   };
 
   const initializeChat = useCallback((char: Character, currentUserName: string, currentUserPersonality: string) => {
@@ -126,6 +129,7 @@ const App: React.FC = () => {
           properties: {
             dialogue: { type: Type.STRING },
             emotion: { type: Type.STRING },
+            indicatorValue: { type: Type.NUMBER },
           },
         },
       },
@@ -151,7 +155,7 @@ const App: React.FC = () => {
   }, [currentPage, handleBackToCharacterList]);
 
   const handleSendMessage = async (userInput: string) => {
-    if (!userInput.trim() || !chatRef.current || isLoading) return;
+    if (!userInput.trim() || !chatRef.current || isLoading || !currentCharacter) return;
 
     const userMessage: Message = { sender: 'user', text: userInput };
     setMessages(prev => [...prev, userMessage]);
@@ -159,9 +163,18 @@ const App: React.FC = () => {
     setLoadingMessage('Thinking...');
 
     try {
-      const { dialogue, emotion } = await getAIResponse(chatRef.current, userInput);
-      const aiMessage: Message = { sender: 'ai', text: dialogue, emotion: emotion as typeof ALL_EMOTIONS[number] || 'neutral' };
+      const { dialogue, emotion, indicatorValue } = await getAIResponse(chatRef.current, userInput);
+      const aiMessage: Message = { sender: 'ai', text: dialogue, emotion: emotion || currentCharacter.emotions[0] || 'neutral' };
       setMessages(prev => [...prev, aiMessage]);
+
+      if (indicatorValue !== null && currentCharacter) {
+        const newIndicatorValue = Math.max(0, Math.min(100, indicatorValue));
+        const updatedCharacter = { ...currentCharacter, indicator: { ...currentCharacter.indicator, value: newIndicatorValue } };
+        setCurrentCharacter(updatedCharacter);
+        await saveCharacter(updatedCharacter);
+        setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
+      }
+
     } catch (error) {
       console.error("Error getting AI response:", error);
       const errorMessage: Message = { sender: 'system', text: 'Sorry, I encountered an error. Please try again.' };
@@ -202,8 +215,8 @@ const App: React.FC = () => {
             setIsLoading(false);
             return;
         }
-        const assets = await generateCharacterAssets(data);
-        finalCharacter = { ...assets, id: editingCharacter?.id || Date.now().toString() };
+        const { sprites: generatedSprites, emotions: generatedEmotions } = await generateCharacterAssets(data);
+        finalCharacter = { ...data, id: editingCharacter?.id || Date.now().toString(), sprites: generatedSprites, emotions: generatedEmotions };
       }
 
       await saveCharacter(finalCharacter);
@@ -351,6 +364,21 @@ const App: React.FC = () => {
       await saveCharacter(updatedCharacter);
     }
   };
+
+  const handleUpdateIndicator = async (newValue: number) => {
+    if (!currentCharacter) return;
+    const newIndicatorValue = Math.max(0, Math.min(100, newValue));
+    const updatedCharacter = { ...currentCharacter, indicator: { ...currentCharacter.indicator, value: newIndicatorValue } };
+    
+    setCurrentCharacter(updatedCharacter);
+    await saveCharacter(updatedCharacter);
+    setCharacters(chars => chars.map(c => c.id === updatedCharacter.id ? updatedCharacter : c));
+    
+    setMessages(prev => [...prev, { sender: 'system', text: `${updatedCharacter.indicator.name} has been set to ${newIndicatorValue}.` }]);
+    
+    // Re-initialize chat with new indicator value in context
+    initializeChat(updatedCharacter, userName, userPersonality);
+  };
   
   const handleImportCharacters = async (importedData: any) => {
     setIsLoading(true);
@@ -370,12 +398,14 @@ const App: React.FC = () => {
       
       const promises = charactersToImport.map(char => {
         let charToSave = { ...char };
-        // Ensure all emotion sprites are present, even if undefined in import
-        ALL_EMOTIONS.forEach(emotion => {
-          if (!charToSave.sprites[emotion]) {
-            charToSave.sprites[emotion] = charToSave.sprites.neutral; // Fallback to neutral
-          }
-        });
+        // Ensure indicator exists
+        if (!charToSave.indicator) {
+            charToSave.indicator = { name: 'Affection', value: 50 };
+        }
+        // Ensure emotions array exists
+        if (!charToSave.emotions || charToSave.emotions.length === 0) {
+            charToSave.emotions = Object.keys(charToSave.sprites);
+        }
 
         if (existingIds.has(charToSave.id)) {
           // If ID exists, update the existing character
@@ -446,6 +476,7 @@ const App: React.FC = () => {
             onBack={() => window.history.back()}
             onShowSettings={() => setShowChatSettings(true)}
             onSaveTransform={handleSaveTransform}
+            onUpdateIndicator={handleUpdateIndicator}
             isLoading={isLoading}
           />
         )}

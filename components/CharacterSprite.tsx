@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import type { Character, Emotion } from '../types';
+import type { Character } from '../types';
 
 interface CharacterSpriteProps {
   character: Character;
-  emotion: Emotion;
+  emotion: string;
   transform?: {
     x: number;
     y: number;
@@ -13,11 +12,16 @@ interface CharacterSpriteProps {
 }
 
 const CharacterSprite: React.FC<CharacterSpriteProps> = ({ character, emotion, transform }) => {
-  const [currentUrl, setCurrentUrl] = useState<string>(character.sprites[emotion]);
+  const getSpriteUrl = (emo: string): string => {
+    // Fallback to the first defined emotion if the current one doesn't exist.
+    return character.sprites[emo] || character.sprites[character.emotions[0]];
+  };
+  
+  const [currentUrl, setCurrentUrl] = useState<string>(getSpriteUrl(emotion));
   const [isFading, setIsFading] = useState<boolean>(false);
 
   useEffect(() => {
-    const newUrl = character.sprites[emotion];
+    const newUrl = getSpriteUrl(emotion);
     if (newUrl && newUrl !== currentUrl) {
       setIsFading(true);
       setTimeout(() => {
@@ -25,7 +29,7 @@ const CharacterSprite: React.FC<CharacterSpriteProps> = ({ character, emotion, t
         setIsFading(false);
       }, 300); // Half of the transition duration
     }
-  }, [emotion, character.sprites, currentUrl]);
+  }, [emotion, character.sprites, currentUrl, character.emotions]);
 
   if (!currentUrl) return null;
 

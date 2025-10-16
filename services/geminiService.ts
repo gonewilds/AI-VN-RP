@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from '@google/genai';
+import { GoogleGenAI, Chat, GenerateContentResponse } from '@google/genai';
 import type { Character } from '../types';
 
 let aiInstance: GoogleGenAI | null = null;
@@ -23,30 +23,23 @@ export const getAI = (): GoogleGenAI => {
   return aiInstance;
 };
 
-export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' | '3:4' = '1:1'): Promise<string> => {
+export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' | '3:4' | '4:3' | '9:16' = '1:1'): Promise<string> => {
   const ai = getAI();
   try {
-    const fullPrompt = `${prompt}, aspect ratio ${aspectRatio}.`;
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-preview-image-generation',
-      contents: {
-        parts: [{ text: fullPrompt }],
-      },
-      config: {
-        responseModalities: [Modality.IMAGE],
-      },
+    const response = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/png',
+          aspectRatio: aspectRatio,
+        },
     });
-
-    const candidate = response.candidates?.[0];
-    if (candidate?.content?.parts) {
-      for (const part of candidate.content.parts) {
-        if (part.inlineData) {
-          const base64ImageBytes: string = part.inlineData.data;
-          // gemini-2.5-flash-image returns PNG
-          return `data:image/png;base64,${base64ImageBytes}`;
-        }
-      }
+    
+    const generatedImage = response.generatedImages?.[0];
+    if (generatedImage?.image?.imageBytes) {
+      const base64ImageBytes: string = generatedImage.image.imageBytes;
+      return `data:image/png;base64,${base64ImageBytes}`;
     }
 
     throw new Error('No image was generated from response.');
@@ -56,7 +49,7 @@ export const generateImage = async (prompt: string, aspectRatio: '1:1' | '16:9' 
   }
 };
 
-export const getAIResponse = async (chat: Chat, userInput: string): Promise<{ dialogue: string; emotion: string }> => {
+export const getAIResponse = async (chat: Chat, userInput: string): Promise<{ dialogue: string; emotion: string, indicatorValue: number | null }> => {
   try {
     const response: GenerateContentResponse = await chat.sendMessage({ message: userInput });
     
@@ -73,14 +66,15 @@ export const getAIResponse = async (chat: Chat, userInput: string): Promise<{ di
     const parsedResponse = JSON.parse(jsonText);
 
     if (typeof parsedResponse.dialogue === 'string' && typeof parsedResponse.emotion === 'string') {
-      return parsedResponse;
+      const indicatorValue = typeof parsedResponse.indicatorValue === 'number' ? parsedResponse.indicatorValue : null;
+      return { ...parsedResponse, indicatorValue };
     }
     
     throw new Error('Invalid JSON structure in AI response.');
   } catch (error) {
     console.error('Error in getAIResponse:', error);
     // Fallback response
-    return { dialogue: "I'm sorry, I had trouble forming a response.", emotion: 'sad' };
+    return { dialogue: "I'm sorry, I had trouble forming a response.", emotion: 'sad', indicatorValue: null };
   }
 };
 

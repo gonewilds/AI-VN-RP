@@ -3,6 +3,7 @@ import type { Character, Message } from '../types';
 import DialogueBox from './DialogueBox';
 import CharacterSprite from './CharacterSprite';
 import TransformControls from './TransformControls';
+import IndicatorMeter from './IndicatorMeter';
 
 interface ChatInterfaceProps {
   character: Character;
@@ -14,6 +15,7 @@ interface ChatInterfaceProps {
   onBack: () => void;
   onShowSettings: () => void;
   onSaveTransform: (characterId: string, transform: { x: number; y: number; scale: number; }) => void;
+  onUpdateIndicator: (newValue: number) => void;
   isLoading: boolean;
 }
 
@@ -36,6 +38,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onBack,
   onShowSettings,
   onSaveTransform,
+  onUpdateIndicator,
   isLoading
 }) => {
   const [userInput, setUserInput] = useState('');
@@ -44,7 +47,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isFullScreen, setIsFullScreen] = useState(!!document.fullscreenElement);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastMessage = messages[messages.length - 1];
-  const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : 'neutral';
+  const currentEmotion = lastMessage?.sender === 'ai' ? lastMessage.emotion : (character.emotions[0] || 'neutral');
 
   const [spriteTransform, setSpriteTransform] = useState(character.transform || { x: 0, y: 0, scale: 1 });
 
@@ -112,6 +115,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
         style={{ backgroundImage: `url(${sceneImageUrl})` }}
       />
+
+      <IndicatorMeter 
+        name={character.indicator.name}
+        value={character.indicator.value}
+        onUpdate={onUpdateIndicator}
+      />
       
       <div className="absolute top-2 right-2 z-10 flex items-center space-x-2">
          <button 
@@ -150,7 +159,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       <div className="flex-grow flex justify-center items-end pb-40 overflow-hidden">
-        <CharacterSprite character={character} emotion={currentEmotion || 'neutral'} transform={spriteTransform} />
+        <CharacterSprite character={character} emotion={currentEmotion} transform={spriteTransform} />
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-4">

@@ -123,7 +123,7 @@ const CharacterListPage: React.FC<CharacterListPageProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {characters.map(char => (
                 <div key={char.id} className="group relative aspect-[3/4] bg-gray-800 rounded-lg overflow-hidden shadow-lg border-2 border-transparent hover:border-pink-500 transition-all duration-300">
-                <img src={char.sprites.neutral} alt={char.name} className="w-full h-full object-cover group-hover:opacity-30 transition-opacity duration-300" loading="lazy" />
+                <img src={char.sprites[char.emotions[0]] || 'https://via.placeholder.com/300x400.png?text=No+Sprite'} alt={char.name} className="w-full h-full object-cover group-hover:opacity-30 transition-opacity duration-300" loading="lazy" />
                 <div className="absolute inset-0 flex flex-col justify-end p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
                     <h2 className="text-base font-bold dialogue-text truncate">{char.name}</h2>
                     <div className="flex flex-col items-stretch mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 space-y-1">
