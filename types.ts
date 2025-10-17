@@ -24,4 +24,5 @@ export interface Message {
   sender: 'user' | 'ai' | 'system';
   text: string;
   emotion?: string;
+  isTyping?: boolean;
 }

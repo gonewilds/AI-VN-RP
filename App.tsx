@@ -200,32 +200,42 @@ const App: React.FC = () => {
   const handleSendMessage = async (userInput: string, isRegeneration = false) => {
     if (!userInput.trim() || !chatRef.current || isLoading || !currentCharacter) return;
 
-    let messagesForAI: Message[];
+    let baseMessages: Message[];
     
-    // When regenerating, the base is the current message list minus the last AI response.
     if (isRegeneration) {
-      messagesForAI = messages.slice(0, -1);
+        baseMessages = messages.slice(0, -1);
+        // Reset chat history for the AI model
+        initializeChat(currentCharacter, baseMessages);
+        await saveChatHistory(currentCharacter.id, baseMessages);
     } else {
-      // For a new message, add the user's input.
-      const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
-      messagesForAI = [...messages, userMessage];
-      // Update UI immediately with user's message.
-      setMessages(messagesForAI);
-      await saveChatHistory(currentCharacter.id, messagesForAI);
+        const userMessage: Message = { id: `${Date.now()}-user`, sender: 'user', text: userInput };
+        baseMessages = [...messages, userMessage];
+        // Update UI immediately with user's message.
+        setMessages(baseMessages);
+        await saveChatHistory(currentCharacter.id, baseMessages);
     }
     
+    const typingIndicator: Message = {
+        id: 'typing-indicator',
+        sender: 'ai',
+        text: '',
+        emotion: currentCharacter.emotions.includes('thinking') ? 'thinking' : (currentCharacter.emotions[0] || 'neutral'),
+        isTyping: true
+    };
+    setMessages([...baseMessages, typingIndicator]);
+
     setIsLoading(true);
-    setLoadingMessage(isRegeneration ? 'Regenerating...' : 'Thinking...');
+    setLoadingMessage(''); // Clear loading message to prevent overlay
 
     try {
       const { dialogue, emotion, indicatorValue } = await getAIResponse(chatRef.current, userInput);
       const aiMessage: Message = { id: `${Date.now()}-ai`, sender: 'ai', text: dialogue, emotion: emotion || currentCharacter.emotions[0] || 'neutral' };
       
-      const finalMessages = [...messagesForAI, aiMessage];
+      const finalMessages = [...baseMessages, aiMessage];
       setMessages(finalMessages);
       await saveChatHistory(currentCharacter.id, finalMessages);
 
-      if (indicatorValue !== null && currentCharacter) {
+      if (indicatorValue !== null) {
         const newIndicatorValue = Math.max(0, Math.min(100, indicatorValue));
         const updatedCharacter = { ...currentCharacter, indicator: { ...currentCharacter.indicator, value: newIndicatorValue } };
         setCurrentCharacter(updatedCharacter);
@@ -236,7 +246,7 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Error getting AI response:", error);
       const errorMessage: Message = { id: `${Date.now()}-system`, sender: 'system', text: 'Sorry, I encountered an error. Please try again.' };
-      const finalMessages = [...messagesForAI, errorMessage];
+      const finalMessages = [...baseMessages, errorMessage];
       setMessages(finalMessages);
       await saveChatHistory(currentCharacter.id, finalMessages);
     } finally {
@@ -248,7 +258,7 @@ const App: React.FC = () => {
     if (isLoading || !currentCharacter) return;
 
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.sender !== 'ai') return;
+    if (lastMessage?.sender !== 'ai' || lastMessage.isTyping) return;
 
     const messagesWithoutLastAI = messages.slice(0, -1);
     const lastUserMessage = messagesWithoutLastAI.findLast(m => m.sender === 'user');
@@ -257,11 +267,6 @@ const App: React.FC = () => {
         alert("Cannot regenerate the initial greeting.");
         return; 
     }
-    
-    setMessages(messagesWithoutLastAI);
-    await saveChatHistory(currentCharacter.id, messagesWithoutLastAI);
-    
-    initializeChat(currentCharacter, messagesWithoutLastAI);
     
     await handleSendMessage(lastUserMessage.text, true);
   };
@@ -540,7 +545,7 @@ const App: React.FC = () => {
   return (
     <div ref={appContainerRef} className="w-screen bg-black flex justify-center items-center overflow-hidden">
       <div className="relative w-full h-full max-w-2xl lg:max-w-4xl aspect-[9/16] sm:aspect-auto bg-gray-900">
-        {isLoading && <LoadingOverlay message={loadingMessage} />}
+        {isLoading && !!loadingMessage && <LoadingOverlay message={loadingMessage} />}
         {showSettings && <SettingsModal currentName={userName} currentPersonality={userPersonality} currentApiKey={apiKey} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />}
         
         {showCreator && (

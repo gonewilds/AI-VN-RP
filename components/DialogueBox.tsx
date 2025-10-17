@@ -52,6 +52,14 @@ const parseMessageText = (text: string): React.ReactNode => {
   });
 };
 
+const TypingIndicator = () => (
+  <span className="typing-indicator" aria-label="AI is typing">
+    <span>.</span>
+    <span>.</span>
+    <span>.</span>
+  </span>
+);
+
 
 const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEditMessage, onDeleteMessage, height }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -86,7 +94,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEd
                 {msg.sender !== 'system' ? (
                     <p className="dialogue-text text-white leading-relaxed">
                     <span className={`font-bold ${getTextColor(msg.sender)}`}>{getDisplayName(msg.sender)}: </span>
-                    {parseMessageText(msg.text)}
+                    {msg.isTyping ? <TypingIndicator /> : parseMessageText(msg.text)}
                     </p>
                 ) : (
                     <p className="dialogue-text text-yellow-400 italic text-sm my-1">
@@ -94,7 +102,7 @@ const DialogueBox: React.FC<DialogueBoxProps> = ({ messages, characterName, onEd
                     </p>
                 )}
             </div>
-            {msg.sender !== 'system' && (
+            {msg.sender !== 'system' && !msg.isTyping && (
                  <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <MessageActions 
                     message={msg}
